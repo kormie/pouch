@@ -652,7 +652,7 @@ var MACROS = [
  {n:'Heal',m:'#showtooltip\n/cast [mod:ctrl,@player][@mouseover,help,nodead][help,nodead][@player] Lesser Heal',note:'Thumb 4. Swap Lesser Heal for Heal at 16; the key stays.'},
  {n:'Flash Heal',m:'#showtooltip\n/cast [mod:ctrl,@player][@mouseover,help,nodead][help,nodead][@player] Flash Heal',note:'Thumb 1 from 20. Before that put Lesser Heal (Rank 1) there as the cheap quick heal.'},
  {n:'Power Word: Fortitude',name:'PW: Fortitude',m:'#showtooltip\n/cast [@mouseover,help,nodead][help,nodead][@player] Power Word: Fortitude',note:'Shift+5. Hover anyone, press, friend for life.'},
- {n:'Resurrection',m:'#showtooltip\n/cast [@mouseover,help,dead][help,dead] Resurrection',note:'Shift+6. Only fires on a dead friendly, so it cannot waste a cast.'},
+ {n:'Resurrection',m:'#showtooltip Resurrection\n/cast [@mouseover,help,dead][help,dead] Resurrection',note:'Shift+6. Only fires on a dead friendly, so it cannot waste a cast. The spell is named on the first line so the tooltip and icon hold when nobody is dead; a bare #showtooltip has nothing to show until a clause matches.'},
  {n:'Dispel Magic',m:'#showtooltip\n/cast [mod:ctrl,@player][@mouseover,help,nodead][help,nodead][@player] Dispel Magic',note:'Shift+1 from 18. Cure Disease on Shift+2 uses the same shape.'},
  {n:'Cure Disease',m:'#showtooltip\n/cast [mod:ctrl,@player][@mouseover,help,nodead][help,nodead][@player] Cure Disease',note:'Shift+2 from 14. The same shape as Dispel Magic.'},
  {n:'Stop casting',m:'/stopcasting',note:'On `. Never in front of a heal; it would clip a Penance channel later.'},
