@@ -1,0 +1,1211 @@
+<!DOCTYPE html>
+<html lang="en-CA">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pouch</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Spectral:wght@600;700&family=Source+Sans+3:ital,wght@0,400;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+/* Second-screen companion: one tab visible at a time, bottom tab bar on phones, top tabs on wide screens. Dark is the working theme; light exists for daytime reading. */
+:root{
+  --bg:#f3f1ea; --surface:#fbfaf6; --sunk:#ebe8de; --ink:#1b1d22; --ink2:#4d525c; --muted:#7d828c; --line:#d9d5c8;
+  --accent:#7a5c12; --accent-ink:#ffffff; --accent-soft:#f1e7c9;
+  --good:#0c8a0c; --warn:#b97a00; --crit:#c23434;
+  --display:"Spectral",Georgia,"Times New Roman",serif;
+  --sans:"Source Sans 3",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#0f1420; --surface:#161c2b; --sunk:#0c111b; --ink:#e9ecf3; --ink2:#b4bac8; --muted:#848b9a; --line:#2a3244;
+    --accent:#e2b85a; --accent-ink:#1a1400; --accent-soft:#2b2a1d;
+    --good:#4fc24f; --warn:#f0b53a; --crit:#ee6a6a; color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0f1420; --surface:#161c2b; --sunk:#0c111b; --ink:#e9ecf3; --ink2:#b4bac8; --muted:#848b9a; --line:#2a3244;
+  --accent:#e2b85a; --accent-ink:#1a1400; --accent-soft:#2b2a1d;
+  --good:#4fc24f; --warn:#f0b53a; --crit:#ee6a6a; color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:17px/1.5 var(--sans);-webkit-text-size-adjust:100%}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+a{color:var(--accent)}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+h1,h2,h3{font-family:var(--display);line-height:1.2;text-wrap:balance;margin:0}
+h1{font-size:1.9rem}
+h2{font-size:1.45rem;margin:0 0 .4em}
+h3{font-size:1.1rem}
+p{margin:.5em 0;max-width:62ch}
+.muted{color:var(--muted)}
+.small{font-size:.9rem}
+.mono{font-family:var(--mono);font-size:.9em}
+
+/* shell */
+.shell{max-width:980px;margin:0 auto;padding:16px 16px 92px}
+header.top{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap;padding:6px 0 14px;border-bottom:1px solid var(--line)}
+.brand{display:flex;flex-direction:column;gap:2px}
+.brand .eyebrow{font:600 .74rem/1 var(--sans);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.brand h1 span{color:var(--accent)}
+.sync{display:inline-flex;align-items:center;gap:7px;font-size:.85rem;color:var(--muted)}
+.sync i{width:9px;height:9px;border-radius:50%;background:var(--muted);display:inline-block}
+.sync[data-s="synced"] i{background:var(--good)}
+.sync[data-s="local"] i{background:var(--warn)}
+.sync[data-s="mirror"] i{background:var(--accent)}
+.mirror-note{margin:10px 0 0;padding:8px 12px;border:1px dashed var(--line);border-radius:10px;font-size:.85rem;color:var(--muted)}
+.mirror-note[hidden]{display:none}
+nav.tabs{display:flex;gap:6px;margin:12px 0 18px;flex-wrap:wrap}
+nav.tabs a{flex:1 1 auto;text-align:center;text-decoration:none;color:var(--ink2);padding:10px 12px;border-radius:10px;border:1px solid var(--line);background:var(--surface);font-weight:600;min-height:44px;display:flex;align-items:center;justify-content:center;gap:6px}
+nav.tabs a[aria-current="page"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+@media (max-width:640px){
+  .shell{padding-bottom:84px}
+  nav.tabs{position:fixed;left:0;right:0;bottom:0;margin:0;padding:8px 8px calc(8px + env(safe-area-inset-bottom));background:var(--surface);border-top:1px solid var(--line);z-index:5}
+  nav.tabs a{padding:8px 4px;font-size:.85rem;border:0;background:transparent;border-radius:8px}
+  nav.tabs a[aria-current="page"]{background:var(--ink);color:var(--bg)}
+}
+section.view{display:none}
+section.view.on{display:block}
+
+/* cards */
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px 18px;margin:12px 0}
+.card.lead{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent) inset}
+.card h2{font-size:1.25rem}
+.card header{display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:6px}
+.pill{display:inline-block;font:700 .7rem/1 var(--sans);letter-spacing:.06em;text-transform:uppercase;padding:5px 9px;border-radius:999px;background:var(--sunk);color:var(--ink2);white-space:nowrap}
+.pill.acc{background:var(--accent);color:var(--accent-ink)}
+.pill.good{background:var(--good);color:#fff}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.stack{display:flex;flex-direction:column;gap:8px}
+
+/* controls */
+.chips{display:flex;gap:8px;flex-wrap:wrap}
+.chip{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:9px 14px;min-height:44px;font-weight:600;color:var(--ink2)}
+.chip[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.stepper{display:inline-flex;align-items:center;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--surface)}
+.stepper button{width:48px;height:48px;border:0;background:transparent;font-size:1.4rem;font-weight:700}
+.stepper button:hover{background:var(--sunk)}
+.stepper output{min-width:64px;text-align:center;font:700 1.5rem/1 var(--sans);font-variant-numeric:tabular-nums}
+label.f{display:flex;flex-direction:column;gap:4px;font-size:.85rem;color:var(--ink2);font-weight:600}
+label.f input,label.f select,label.f textarea{border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:9px 11px;min-height:44px;font-weight:400;color:var(--ink);width:100%}
+label.f textarea{min-height:64px;resize:vertical}
+.num{width:92px}
+.btn{border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:9px 14px;min-height:44px;font-weight:600}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.btn.quiet{background:transparent}
+.btn:hover{border-color:var(--accent)}
+
+/* checklists */
+ul.checks{list-style:none;margin:6px 0 0;padding:0}
+ul.checks li{display:flex;gap:12px;align-items:flex-start;padding:10px 0;border-top:1px solid var(--line)}
+ul.checks li:first-child{border-top:0}
+ul.checks input{width:24px;height:24px;margin:2px 0 0;flex:none;accent-color:var(--accent)}
+ul.checks label{cursor:pointer;flex:1}
+ul.checks li.done label{color:var(--muted);text-decoration:line-through}
+.when{font:600 .78rem/1 var(--mono);color:var(--accent);display:block;margin-bottom:3px}
+
+/* now panel */
+.countdown{font:700 2.2rem/1.1 var(--display);font-variant-numeric:tabular-nums}
+.countdown small{display:block;font:400 .95rem/1.4 var(--sans);color:var(--muted);margin-top:4px}
+.sugg{border-left:4px solid var(--accent);padding:8px 0 8px 14px;margin:10px 0}
+.sugg h3{font-family:var(--sans);font-size:1.05rem}
+.sugg p{margin:.25em 0}
+.next{display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+.next .big{font:700 2rem/1 var(--display);color:var(--accent)}
+
+/* progress bars */
+.dim{display:grid;grid-template-columns:150px 1fr auto;gap:10px;align-items:center;padding:8px 0;border-top:1px solid var(--line)}
+.dim:first-child{border-top:0}
+.dim .lab{font-weight:600;font-size:.95rem}
+.dim .lab small{display:block;font-weight:400;color:var(--muted);font-size:.8rem}
+.bar{position:relative;height:12px;background:var(--sunk);border-radius:999px;overflow:visible}
+.bar i{position:absolute;left:0;top:0;bottom:0;background:var(--accent);border-radius:999px 4px 4px 999px;min-width:0;transition:width .25s}
+.bar b{position:absolute;top:-4px;width:2px;height:20px;background:var(--muted);opacity:.6}
+.bar b::after{content:attr(data-l);position:absolute;top:20px;left:-10px;font:600 .68rem/1 var(--mono);color:var(--muted)}
+.dim .val{font:700 1rem/1 var(--mono);font-variant-numeric:tabular-nums;min-width:64px;text-align:right}
+.dim input{width:80px;border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:6px 8px;text-align:right;font-family:var(--mono)}
+@media (max-width:560px){.dim{grid-template-columns:1fr;gap:6px}.dim .val{text-align:left}}
+.milestones{list-style:none;margin:0;padding:0}
+.milestones li{display:grid;grid-template-columns:52px 1fr;gap:12px;padding:10px 0;border-top:1px solid var(--line)}
+.milestones li:first-child{border-top:0}
+.milestones .lv{font:700 1.3rem/1 var(--display);color:var(--accent)}
+.milestones li.past .lv{color:var(--muted)}
+.milestones li.past{opacity:.6}
+.milestones li.now{background:var(--accent-soft);border-radius:10px;padding:10px;margin:0 -10px}
+.milestones .tag{font:600 .72rem/1 var(--mono);color:var(--muted);margin-left:6px}
+.camp{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px}
+.camp div{border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+.camp div.ready{border-color:var(--good)}
+.camp b{display:block}
+.feel{display:grid;grid-template-columns:1fr;gap:6px}
+.feel label{display:grid;grid-template-columns:130px 1fr 28px;gap:10px;align-items:center;font-size:.9rem}
+.feel input[type=range]{width:100%;accent-color:var(--accent)}
+.feel output{font-family:var(--mono);font-weight:700;text-align:right}
+.score{font:700 1.6rem/1 var(--display)}
+
+/* kit */
+pre.macro{margin:6px 0 0;padding:10px 12px;background:var(--sunk);border-radius:10px;font:.85rem/1.5 var(--mono);white-space:pre-wrap;word-break:break-word}
+.khead{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:12px;font-weight:600;font-size:.92rem}
+table.binds{border-collapse:collapse;width:100%;font-size:.92rem}
+table.binds td,table.binds th{text-align:left;padding:7px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+table.binds th{font-size:.74rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+table.binds td:first-child{font-family:var(--mono);font-weight:600;white-space:nowrap}
+table.ladder tr.past td{color:var(--muted)}
+table.ladder tr.past td:first-child::after{content:" \2713";color:var(--good)}
+table.ladder tr.now td{font-weight:700}
+table.ladder tr.now td:first-child{color:var(--accent)}
+details{border-top:1px solid var(--line);padding:8px 0}
+details summary{cursor:pointer;font-weight:600;padding:6px 0;list-style:none;display:flex;justify-content:space-between;align-items:center}
+details summary::after{content:"+";font-weight:700;color:var(--accent)}
+details[open] summary::after{content:"−"}
+
+/* week */
+.days{display:grid;grid-template-columns:repeat(auto-fit,minmax(118px,1fr));gap:8px}
+.day{border:1px solid var(--line);border-radius:12px;padding:10px;background:var(--surface)}
+.day b{display:block;font-family:var(--display);font-size:1.05rem}
+.day small{color:var(--muted);display:block}
+.day input{width:100%;margin-top:6px;border:1px solid var(--line);background:var(--sunk);border-radius:8px;padding:6px 8px;text-align:right;font-family:var(--mono)}
+.day .proj{font:600 .85rem/1.3 var(--sans);color:var(--ink2);margin-top:6px}
+.day.today{border-color:var(--accent)}
+figure{margin:12px 0 0}
+figure svg{width:100%;height:auto;display:block;color:var(--ink)}
+figcaption{font-size:.88rem;color:var(--muted);margin-top:6px}
+.plan{list-style:none;margin:0;padding:0}
+.plan li{padding:10px 0;border-top:1px solid var(--line);display:grid;grid-template-columns:120px 1fr;gap:12px}
+.plan li:first-child{border-top:0}
+.plan .d{font-family:var(--display);font-weight:700}
+.plan .d small{display:block;font:400 .8rem/1.3 var(--sans);color:var(--muted)}
+.plan .d em{display:block;font:600 .8rem/1.3 var(--mono);color:var(--accent);font-style:normal}
+@media (max-width:520px){.plan li{grid-template-columns:1fr;gap:4px}}
+
+/* log */
+.entry{padding:10px 0;border-top:1px solid var(--line);display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:start}
+.entry:first-child{border-top:0}
+.entry .d{font-family:var(--mono);font-size:.85rem;color:var(--muted);white-space:nowrap}
+.entry .lv{font:700 1rem/1.2 var(--sans)}
+.entry p{margin:.2em 0;font-size:.92rem}
+.entry button{border:0;background:transparent;color:var(--muted);text-decoration:underline;font-size:.85rem;padding:4px}
+textarea.io{width:100%;min-height:120px;border:1px solid var(--line);background:var(--sunk);border-radius:10px;padding:10px;font:.8rem/1.4 var(--mono);color:var(--ink)}
+.toast{position:fixed;left:50%;bottom:96px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:999px;font-weight:600;box-shadow:0 8px 30px rgba(0,0,0,.3);opacity:0;pointer-events:none;transition:opacity .2s}
+.toast.on{opacity:1}
+@media (prefers-reduced-motion:reduce){*{transition:none !important}}
+</style>
+</head>
+<body>
+<div class="shell">
+<header class="top">
+  <div class="brand">
+    <span class="eyebrow">Launch week · WoW Forever · Alliance</span>
+    <h1>Pouch <span>·</span> a companion for the Marsoopials</h1>
+    <span class="muted small">Kooala first. One screen at a time. Nothing here nags.</span>
+  </div>
+  <span class="sync" id="sync" data-s="local"><i aria-hidden="true"></i><span id="syncText">Saved on this device</span></span>
+</header>
+<p class="mirror-note" id="mirrorNote" hidden>This copy reads <code>state.json</code> beside it, which the courier refreshes after each play session. Anything you change here stays in this browser until the next refresh replaces it; the game and the private page are where changes stick.</p>
+<nav class="tabs" aria-label="Sections">
+  <a href="#now" data-v="now">Now</a>
+  <a href="#week" data-v="week">Week</a>
+  <a href="#progress" data-v="progress">Progress</a>
+  <a href="#kit" data-v="kit">Kit</a>
+  <a href="#log" data-v="log">Log</a>
+</nav>
+
+<!-- NOW -->
+<section class="view" id="v-now" aria-labelledby="now-h">
+  <h2 id="now-h" class="visually-hidden" style="position:absolute;left:-9999px">Now</h2>
+
+  <div class="card lead" id="countCard">
+    <header><span class="pill acc" id="phasePill">Before launch</span><span class="muted small" id="nowClock"></span></header>
+    <div class="countdown" id="countdown">…<small>until Wednesday 4 November, 6:00 p.m. EST</small></div>
+    <p id="phaseLine" class="small"></p>
+  </div>
+
+  <div class="card" id="sessionCard">
+    <header><h2>This session</h2><span class="muted small">Set three things, get three suggestions</span></header>
+    <div class="row" style="gap:18px">
+      <div class="stack"><span class="small muted">Kooala's level</span>
+        <div class="stepper" role="group" aria-label="Kooala's level">
+          <button type="button" id="lvDown" aria-label="Level down">−</button>
+          <output id="lvOut" aria-live="polite">1</output>
+          <button type="button" id="lvUp" aria-label="Level up">+</button>
+        </div>
+      </div>
+      <div class="stack"><span class="small muted">Time I have</span>
+        <div class="chips" id="minsChips" role="group" aria-label="Time available">
+          <button class="chip" type="button" data-m="30">30 min</button>
+          <button class="chip" type="button" data-m="60">1 h</button>
+          <button class="chip" type="button" data-m="120">2 h</button>
+          <button class="chip" type="button" data-m="240">Big block</button>
+        </div>
+      </div>
+      <div class="stack"><span class="small muted">Mood</span>
+        <div class="chips" id="moodChips" role="group" aria-label="Mood">
+          <button class="chip" type="button" data-mood="push">Push</button>
+          <button class="chip" type="button" data-mood="chill">Chill</button>
+          <button class="chip" type="button" data-mood="social">Social</button>
+          <button class="chip" type="button" data-mood="chores">Chores</button>
+        </div>
+      </div>
+    </div>
+    <div id="suggestions"></div>
+    <div class="next" id="nextMs"></div>
+    <p class="small muted" id="stopLine"></p>
+  </div>
+
+  <div class="card" id="prelaunchCard">
+    <header><h2>Before Wednesday</h2><span class="muted small" id="preCount"></span></header>
+    <p>Eight things, one of them optional. Everything else can wait until you are in the world.</p>
+    <ul class="checks" id="preList"></ul>
+  </div>
+
+  <div class="card" id="launchNightCard">
+    <header><h2>Launch night protocol</h2><span class="muted small">Wednesday 4 November, times in EST</span></header>
+    <p>The first two hours of any launch are the worst two hours to level efficiently and the best two hours to be there. Plan for the queue, group the kill quests, and stop on time.</p>
+    <ul class="checks" id="nightList"></ul>
+  </div>
+
+  <div class="card">
+    <header><h2>When it breaks</h2></header>
+    <div id="breaks"></div>
+  </div>
+</section>
+
+<!-- WEEK -->
+<section class="view" id="v-week" aria-labelledby="week-h">
+  <div class="card lead">
+    <header><h2 id="week-h">The week, shaped by your hours</h2><span class="muted small">Edit the hours. The projection follows.</span></header>
+    <p>Weeknights are short loops. The weekend is where the week happens. Type the hours you will really have and the plan projects where Kooala lands by Tuesday night. The projection uses a Classic-derived pace with a guide and launch chaos, and it recalibrates from your log once you have two entries.</p>
+    <div class="days" id="days"></div>
+    <figure>
+      <svg id="projSvg" viewBox="0 0 720 220" role="img" aria-label="Projected level at the end of each day, with logged levels as dots"></svg>
+      <figcaption id="projCap"></figcaption>
+    </figure>
+  </div>
+
+  <div class="card">
+    <header><h2>Day by day</h2><span class="muted small">Intent per day, not quotas</span></header>
+    <ul class="plan" id="plan"></ul>
+  </div>
+
+  <div class="card">
+    <header><h2>Pace model</h2><span class="muted small">Cumulative hours played to reach a level</span></header>
+    <p class="small">Classic numbers for a player following a guide, padded for a launch week. Treat the first column as a prior. Your log replaces it.</p>
+    <div id="paceTable"></div>
+  </div>
+</section>
+
+<!-- PROGRESS -->
+<section class="view" id="v-progress" aria-labelledby="prog-h">
+  <div class="card lead">
+    <header><h2 id="prog-h">Every dimension, one board</h2><span class="muted small">Type a number when it changes</span></header>
+    <p>Level is one bar out of twelve. The others are where Forever hides its progression: trades gate camp features at 20, Legacy opens at 25, dungeon tiers open at 15, 26 and 46, and every alt that reaches 25 adds a Legacy point the main can spend.</p>
+    <div id="dims"></div>
+  </div>
+
+  <div class="card">
+    <header><h2>Camp features Kooala can bring</h2><span class="muted small">Skill 20 in each trade, one contribution per player, one hour shared cooldown</span></header>
+    <div class="camp" id="camp"></div>
+    <p class="small muted">Blizzard's Camping overview: a Basic Campfire takes three features, you sit or craft for a minute to get the buffs, and each feature is exclusive with the class buff it mirrors. The Faction Banner is Spirit, which a priest without Divine Spirit will feel.</p>
+  </div>
+
+  <div class="card">
+    <header><h2>Milestones</h2><span class="muted small">What each level unlocks and what to do about it</span></header>
+    <ul class="milestones" id="msList"></ul>
+    <p class="small muted">Forever-specific items come from Blizzard's Priest deep dive and beta notes as collected on the Four Roads Priest page; spell levels without a tag are Classic and may have moved. Check the trainer.</p>
+  </div>
+
+  <div class="card">
+    <header><h2>Legacy</h2><span class="muted small">Account-wide points, 16 spendable per character at launch</span></header>
+    <p>Sixty-five challenges, one point each. Twenty-seven are class milestones at 25, 45 and 60, so your four roads are a point engine: four characters at 25 is four points. Tradeskill points come at 150, 225 and 300 in non-gathering primaries, which is why repeating profession pairs across alts costs you points later. Dungeon points come from the final boss of each tier.</p>
+    <div class="grid2">
+      <div><b>Earn first</b><p class="small">Kooala 25 (1). Tailoring 150 (1). Tier-one final boss (1). Then each alt at 25.</p></div>
+      <div><b>The roster as an engine</b><p class="small">Eight of nine classes means the class milestones alone can pay 24 points over time. The six crafting trades (Tailoring, Enchanting, Leatherworking, Alchemy, Blacksmithing, Engineering) pay 18 more at 150, 225 and 300, but only once each, so a spread beats a repeat: Kooala keeps Tailoring and Enchanting, Quookka Leatherworking, and Walaroo, Woombat, Mars, Bandicoot and Oopossum could take the other four between them with gathering to feed them. A week-two decision, not a launch-week one.</p></div>
+      <div><b>Spend candidates</b><p class="small">Thrill of Adventure (health and mana after kills; a priest's best friend). Well Rested (parked alts). Talented (points up to five levels early). Field Guide (shorter camping cooldown). Read the live tree before the first point; no spend order is promised here.</p></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <header><h2>The feel test</h2><span class="muted small">Score after a real dungeon heal, never before</span></header>
+    <p>You keep Kooala unless another healer beats her by three or more after its own dungeon heal. Novelty scores high; wait a day before trusting a score.</p>
+    <div class="grid2" id="feel"></div>
+  </div>
+</section>
+
+<!-- KIT -->
+<section class="view" id="v-kit" aria-labelledby="kit-h">
+  <div class="card lead">
+    <header><h2 id="kit-h">Decisions</h2><span class="muted small">Tap to set. Changing one later is allowed.</span></header>
+    <div class="stack" id="decisions"></div>
+  </div>
+
+  <div class="card">
+    <header><h2>The talent ladder, 11 to 25</h2><span class="pill">Opinion, yours to overrule</span></header>
+    <p><b>Shadow for the week, with a two-point detour into Discipline.</b> Kooala took the detour at 12 and 13 (Wand Specialization 2/2, confirmed on the <a href="https://worldofwarcraft.blizzard.com/en-us/forever/us/armory/character/kooala-marsoopial" target="_blank" rel="noopener">armory</a>); from here every point goes to Shadow Magic. Mind Flay lands at 22 instead of 20; the wand points pay that back many times over. Trained heals carry the 15 to 25 dungeon tier with no talent help, so the healing feel test is unaffected. Rows tick themselves off from the level on the Now tab. The same ladder, in Kooala's real order, is <a href="https://talentsforever.com/priest/60/02--305021012-l2Blnjqro-12?b=70755h&amp;d=261106" target="_blank" rel="noopener">open in Talents Forever</a>, which reads the live game build; add a point there to see the next row's text.</p>
+    <table class="binds ladder" id="ladder"><thead><tr><th>Level</th><th>Point</th><th>What it buys</th></tr></thead><tbody>
+      <tr data-lv="12"><td>12</td><td>Wand Specialization 1/2 (Discipline)</td><td>+13% wand damage</td></tr>
+      <tr data-lv="13"><td>13</td><td>Wand Specialization 2/2</td><td>+25%. Discipline is done until the respec.</td></tr>
+      <tr data-lv="14"><td>14</td><td>Spirit Tap 3/5</td><td>60% chance a kill refills mana</td></tr>
+      <tr data-lv="15"><td>15</td><td>Spirit Tap 4/5</td><td>80%</td></tr>
+      <tr data-lv="16"><td>16</td><td>Spirit Tap 5/5</td><td>Every kill refills. Shadow row 2 opens.</td></tr>
+      <tr data-lv="17"><td>17</td><td>Improved Shadow Word: Pain 1/2</td><td>+3 s on the DoT</td></tr>
+      <tr data-lv="18"><td>18</td><td>Improved Shadow Word: Pain 2/2</td><td>+6 s: one cast covers most fights</td></tr>
+      <tr data-lv="19"><td>19</td><td>Shadow Focus 1/5</td><td>+1% Shadow hit per rank. A row-1 talent in Forever, so it is the filler on the walk to the 10-point gate.</td></tr>
+      <tr data-lv="20"><td>20</td><td>Shadow Focus 2/5</td><td>+2% hit. Train Holy Fire and Devouring Plague; the Contingency Plan quest is here too.</td></tr>
+      <tr data-lv="21"><td>21</td><td>Shadow Focus 3/5</td><td>+3% hit, and 10 points in Shadow Magic: row 3 opens</td></tr>
+      <tr data-lv="22"><td>22</td><td>Mind Flay</td><td>The spike: 63 Shadow damage over 3 s at rank 1 and a 50% slow. Rotation becomes Mind Blast, SW:P, Mind Flay, wand.</td></tr>
+      <tr data-lv="23"><td>23</td><td>Improved Mind Flay 1/2</td><td>Each tick hits 10% harder than the one before, so finish the channel; the last tick carries the weight.</td></tr>
+      <tr data-lv="24"><td>24</td><td>Improved Mind Flay 2/2</td><td>20% per tick</td></tr>
+      <tr data-lv="25"><td>25</td><td>Shadow Reach 1/2</td><td>+10% range on offensive Shadow spells. 25 is also the first Legacy class milestone and the natural respec checkpoint.</td></tr>
+    </tbody></table>
+    <p><b>Wand, solved.</b> Deepblaze, the blue wand from the Hall of Thanes quest Old Ironforge Incursion (22 to 41 Fire damage at 1.70 speed, 18.5 damage per second), replaced the practice wand at 14, and Wand Specialization multiplies it. Nothing Enchanting can make comes close until the 40s, so wand upgrades from here are quest and dungeon drops; the Dwarven Tome off-hand from the same dungeon (+2 Spirit, +4 spell damage and healing) is the other keeper.</p>
+    <p><b>The 30-to-40 decision.</b> Dual spec arrives at 40, so one tree has to do both jobs only between 30 and 40. Dungeon healing before 40 runs on trained spells (Shield, Renew, Heal, Flash Heal at 20, Prayer of Healing at 30); talents only move the margins. The rule: if most evenings in that stretch are dungeons, respec at 30 to the Discipline bridge (Wand Specialization 2, Twin Disciplines 5, Mental Strength 5, Mental Agility 3, Improved Shield 3, Meditation 2, Penance) and buy Shadow back at 40 as the second spec. If most evenings are solo with the odd run, stay Shadow to 40: Spirit Tap also fires when a mob carrying your Vampiric Embrace dies (from 27), so packs refill you even when the tank gets the kill, and Shadowform at 40 is the biggest solo spike the class has.</p>
+    <p><b>At 60.</b> Two specs, no compromise: Shadow for solo, and a Holy-heavy healing tree for groups (about 19/32/0, Discipline for Meditation, Inner Focus and Mental Strength). Every pre-raid ranking projects Holy Priest as the top raid healer; raids open 9 December and will say whether they were right. Prayer of Mending is Holy's 35-point capstone (earliest 44, behind Spirit of Redemption); a 15/36/0 keeps Meditation and Inner Focus and takes it, a fair trade for dungeon healing, and it is the reason Holy tops the raid lists.</p>
+    <p class="small muted">Respec costs climb within a week and reset weekly (TechRadar via Wowhead, Medium). Budget one deliberate respec around 25 to 30, when Penance and Legacy are both in reach. Dual spec unlocks at 40 at the class trainer (Blizzard); its price has not been posted. That makes 30 to 40 the only stretch where one tree has to do both jobs. Ladder checked against the live tree (Talents Forever, game build 70755) and the Kargoz, Mobalytics and Method levelling guides, 6 November.</p>
+  </div>
+
+  <div class="card">
+    <header><h2>Addons</h2><span class="muted small">Four. Two are in; two can wait.</span></header>
+    <div class="stack">
+      <div><b>Polestar</b> <span class="pill good">Installed</span><p class="small">Route guide. Let the CurseForge app update it Wednesday morning; addons load at game start, so no changes after 6:00 p.m. Use it as a suggestion; when a step and the quest log disagree, the log wins. The author says routes are not play-tested on Forever and new 30 to 60 content is missing.</p></div>
+      <div><b>HealKit</b> <span class="pill">After the first dungeon, if needed</span><p class="small">Healer frames with click casting. Its own page lists the limits: it cannot show other healers' HoTs or Wild Growth, cannot sort by health, and Quick Buff works out of combat only. Try the default party frames plus mouseover macros first.</p></div>
+      <div><b>Lucky's Actionbars</b> <span class="pill good">Installed, for one setting</span><p class="small">Builds on the stock bars and adds Edit Mode options. The one you want is Rows Grow, so a 4-row bar puts button 1 top-left and the screen matches the mouse. Leave its other modules alone this week.</p></div>
+      <div><b>Leatrix Plus</b> <span class="pill">Week two</span><p class="small">One convenience module at a time, only for something you missed.</p></div>
+      <p class="small muted">Why so few: Forever hides health, auras and cooldowns from addons in combat and gives them no combat log, so Classic-era addons break or go blank. Beta authors also report addon settings vanishing at logout while macros survive on the server. Keep anything you cannot afford to lose in macros and Blizzard keybinds.</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <header><h2>Settings worth touching</h2><span class="muted small">Five, then play</span></header>
+    <ul class="checks" id="settingsList"></ul>
+  </div>
+
+  <div class="card">
+    <header><h2>The thumb grid</h2><span class="muted small">Naga V3 Pro, no software needed</span></header>
+    <p>Razer's own support page says it plainly (updated 14 Oct 2026): the V3 Pro is not supported in Synapse for Mac, and it is plug-and-play without software. Out of the box the twelve thumb buttons send the number row, 1 to 9 then 0, minus and equals, which is exactly what Action Bar 1 is bound to. The thumb grid is Action Bar 1. The keyboard's number row duplicates it, which is the fallback if the mouse dies. The extras on this model (tilt wheel, DPI edge buttons, ring-finger button, the AI Prompt button) send nothing useful until Synapse assigns them, and Synapse has to run on Windows to do it. The mouse keeps the result in on-board memory (Razer: key bindings and DPI stages persist without Synapse; up to five profiles on this model), so one pass on a Windows machine is enough. Do it for the ring finger and the tilt wheel, not for the grid.</p>
+    <p>Modifiers are WoW's layers and Caps is the leader key. The same thumb button does the same job in every layer position: 5 is always the shield, Caps+5 shields you, Shift+5 is Fortitude.</p>
+    <div class="chips" id="layerChips" role="group" aria-label="Layer"></div>
+    <div class="chips" style="margin-top:8px"><button class="chip" type="button" id="flipChip" aria-pressed="false">Show the stock screen order</button></div>
+    <p class="small" id="layerBlurb"></p>
+    <figure style="margin-top:8px">
+      <svg id="gridSvg" viewBox="0 0 400 560" role="img" aria-label="The twelve thumb buttons of the mouse with the spell on each for the selected layer"></svg>
+      <figcaption id="gridCap">Drawn as the mouse: 1, 2, 3 across the top, front of the mouse on the left. Shaded buttons are where the thumb rests: 4, 5, 7 and 8, then 1 and 2. Launch night will tell you which ones your thumb actually finds. Swap within a row, not across rows, so the up-is-friendly rule survives.</figcaption>
+    </figure>
+    <h3 style="margin-top:14px">One-time setup, in game</h3>
+    <ul class="checks" id="setupList"></ul>
+    <h3 style="margin-top:18px">The Windows pass, once</h3>
+    <p class="small">Fifteen minutes on a Windows machine with Synapse 4. After it, the mouse carries the profile and the Mac never needs Razer software.</p>
+    <ul class="checks" id="synapseList"></ul>
+  </div>
+  <div class="card">
+    <header><h2>The screen mirrors the thumb</h2><span class="muted small">Edit Mode, 3 icons by 4 rows</span></header>
+    <p>The bars on screen have three jobs: show cooldowns, show procs and range, and teach the thumb where things are. All three work better when the block on screen has the shape of the block under your thumb. Forever's Edit Mode can draw a 12-icon bar as 4 rows, so Action Bar 1 becomes a 3 by 4 block and Action Bar 2 a second one beside it. Put both under the character, next to the party frames, where a healer's eyes already live. Nothing else on screen needs to move.</p>
+    <figure>
+      <svg id="screenSvg" viewBox="0 0 640 420" role="img" aria-label="Schematic of the screen: party frames, the base thumb grid and the Shift grid clustered under the character, with the Option bar along the bottom edge, chat bottom left, bags bottom right, minimap and quest tracker top right, guide window right"></svg>
+      <figcaption>Schematic, not to scale. The eye line runs party frames, base grid, Shift grid, all within reach of the cast bar. Caps is the same grid, so it needs no bar.</figcaption>
+    </figure>
+    <ul class="checks" id="screenList"></ul>
+  </div>
+
+  <div class="card">
+    <header><h2>The keyboard hand</h2><span class="muted small">Moves, modifies, cancels</span></header>
+    <table class="binds"><thead><tr><th>Key</th><th>Job</th><th>Why</th></tr></thead><tbody id="keys"></tbody></table>
+    <p class="small muted">Mapleader stays a comma and the prefix stays Ctrl+A. The game got the three modifiers it understands and nothing it would fight you for. Loom can wait until the client has shown you how it treats macros.</p>
+  </div>
+
+  <div class="card">
+    <header><h2>Macros</h2><span class="muted small">Ten, plus the template. They live on the server; /pouch setup types them in.</span></header>
+    <div id="macros"></div>
+  </div>
+
+  <div class="card">
+    <header><h2>Sources</h2></header>
+    <ul class="small" id="sources" style="padding-left:1.1em;color:var(--ink2)"></ul>
+  </div>
+</section>
+
+<!-- LOG -->
+<section class="view" id="v-log" aria-labelledby="log-h">
+  <div class="card lead">
+    <header><h2 id="log-h">Log a session</h2><span class="muted small">Thirty seconds, then sleep</span></header>
+    <p class="small muted"><a href="https://loreforeverwow.com/u/kooala" target="_blank" rel="noopener">Lore Forever</a> keeps the automatic journal (steps, quests, deaths, hours recorded, level reached per day). This log is the human one: hours you would count as play, what broke, what was fun. The Week tab reads levels and hours from here, so copy those two from Lore Forever if you cannot remember. Its days roll over at 7 p.m. Eastern (UTC midnight), so a late night lands on the next date there.</p>
+    <div class="grid2">
+      <label class="f">Date<input type="date" id="logDate"></label>
+      <label class="f">Level at logout<input type="number" id="logLevel" min="1" max="60" inputmode="numeric"></label>
+      <label class="f">Hours played<input type="number" id="logHours" min="0" max="24" step="0.25" inputmode="decimal"></label>
+      <label class="f">Client build<input type="text" id="logBuild" placeholder="1.60.1.7xxxx" class="mono"></label>
+      <label class="f">What broke<textarea id="logBroke" placeholder="Addon settings reset at logout; guide step 14 missing"></textarea></label>
+      <label class="f">What was fun<textarea id="logFun" placeholder="Healed four strangers through the troggs"></textarea></label>
+    </div>
+    <div class="row" style="margin-top:10px"><button class="btn primary" type="button" id="logAdd">Save entry</button><span class="small muted">Saved to this device, and to your account when sync is on.</span></div>
+  </div>
+
+  <div class="card" id="scribeCard">
+    <header><h2>From Scribe</h2><span class="muted small">/pouch in the game, Cmd+C, paste here</span></header>
+    <p class="small muted">Pouch Scribe is the addon. Its line adds a Kooala entry for that session (or updates the one you pasted earlier), sets any alt's level, and fills the profession, talent and gold bars. What broke and what was fun stay yours: add them on the entry.</p>
+    <label class="f">Scribe line, or drop the saved file here<textarea id="scribeIn" placeholder='{"v":1,"src":"scribe","char":"Kooala", ...}'></textarea></label>
+    <div class="row" style="margin-top:10px"><button class="btn primary" type="button" id="scribeAdd">Add from Scribe</button><label class="btn" for="scribeFile" style="display:inline-flex;align-items:center;cursor:pointer">Read PouchScribe.lua<input type="file" id="scribeFile" accept=".lua,.txt,text/plain" hidden></label><button class="btn quiet" type="button" id="scribeHandle" hidden>Remember and re-read the file</button></div>
+    <p class="small muted" id="scribeMsg"></p>
+    <p class="small muted">No clipboard needed: the game writes every session to <span class="mono">_forever_/WTF/Account/DKORMUSHOFF/SavedVariables/PouchScribe.lua</span> at logout or /reload. Pick it, drop it on the box, or (Chrome on the Mac, when this page is open as its own tab) let the browser remember it so one button re-reads it. In the picker, Cmd+Shift+G takes the path.</p>
+    <details><summary>Feed the addon</summary>
+      <p class="small">Scribe says what this page says: the talent ladder, the milestones, the ten macros, the thumb-grid bindings and the stop time all travel as one generated file. Download it, drop it in <span class="mono">_forever_/Interface/AddOns/PouchScribe/</span> over the old Data.lua, and <span class="mono">/reload</span>. Change anything here, download again.</p>
+      <div class="row"><button class="btn" type="button" id="scribeData">Download Scribe data (Data.lua)</button><a class="small" href="https://github.com/kormie/pouch-scribe" target="_blank" rel="noopener">The addon</a></div>
+    </details>
+  </div>
+
+  <div class="card">
+    <header><h2>Entries</h2><span class="muted small" id="logCount"></span></header>
+    <div id="entries"></div>
+  </div>
+
+  <div class="card">
+    <header><h2>Carry it</h2><span class="muted small">Export or paste a copy</span></header>
+    <div class="row"><button class="btn" type="button" id="exportBtn">Copy everything as text</button><button class="btn quiet" type="button" id="importBtn">Paste a copy in</button><button class="btn quiet" type="button" id="resetBtn">Start over</button></div>
+    <textarea class="io" id="io" aria-label="Export or import text" hidden></textarea>
+  </div>
+</section>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<script>
+window.P = (function(){
+var LAUNCH = Date.UTC(2026,10,4,23,0,0); // Wed 4 Nov 2026, 23:00 UTC = 6:00 p.m. EST
+var DAYS = [
+ {k:'wed',label:'Wed 4',date:'2026-11-04',def:3,title:'Launch night',body:'Queue at 6:00, play after dinner, stop on time. Target is a working interface, binds for the first spells, and a safe logout. Level is whatever it is.'},
+ {k:'thu',label:'Thu 5',date:'2026-11-05',def:2,title:'The first loop',body:'One connected quest loop. At 10: first talent point, Mind Blast, Confounding Flash. First Ironforge trip: Tailoring and Enchanting trainers, a wand, bags, Cooking and First Aid when passing.'},
+ {k:'fri',label:'Fri 6',date:'2026-11-06',def:2.5,title:'Reach the dungeon tier',body:'Quest loop toward 15. Fish for ten minutes on the way to anything; Fishing 20 is the first camp feature. Park at an inn for rested XP before the weekend.'},
+ {k:'sat',label:'Sat 7',date:'2026-11-07',def:5,title:'First dungeon heal',body:'The centrepiece. Heal one tier-one run while energy is high, then quest. Score the feel test afterwards, not during. Finish with fishing or cooking as the wind-down.'},
+ {k:'sun',label:'Sun 8',date:'2026-11-08',def:4,title:'Twenty',body:'Flash Heal, Holy Fire, Devouring Plague, Mind Flay on the Shadow road, and the Contingency Plan class quest. Any trade at 20 unlocks a camp feature: contribute one, sit a minute, talk.'},
+ {k:'mon',label:'Mon 9',date:'2026-11-09',def:1.5,title:'Short loop or a change of pace',body:'Chores first (train, repair, mail), then a short loop. If Kooala feels like work tonight, Quookka\'s Zephras Isle opener is 1 to 12 and a whole evening, not a chore.'},
+ {k:'tue',label:'Tue 10',date:'2026-11-10',def:1.5,title:'Review',body:'Feel test totals, Legacy ETA, pace versus the model, and three priorities for next week. Keep or change the main as your explicit decision.'}
+];
+var PACE = [[1,0],[5,1],[10,3.5],[12,5],[15,8.5],[18,12],[20,14.5],[22,17.5],[25,22.5],[28,27.5],[30,31],[35,41],[40,52],[45,64],[50,78],[55,94],[60,112]];
+var PRE = [
+ {id:'bnet',t:'Battle.net: Forever installed, updated, game time active. Update again Wednesday morning.'},
+ {id:'polestar',t:'Polestar and Lucky\'s Actionbars are in. On Wednesday morning let the CurseForge app update both; nothing else goes in before launch.'},
+ {id:'backup',t:'Copy the Forever install\'s Interface and WTF folders somewhere safe, once.'},
+ {id:'binds',t:'Read the Kit\'s thumb grid once. The bindings take five minutes in-game on launch night; the heal macros get typed in then too.'},
+ {id:'decisions',t:'Decisions set in Kit: preset, ruleset, level-10 road, and a stop time for launch night.'},
+ {id:'screen',t:'This page open on a phone or second screen. Discord or music ready.'},
+ {id:'dinner',t:'Dinner plan for 6:00 p.m.: queue first, eat during the queue.'},
+ {id:'naga',t:'If the Naga arrives in time: the Windows pass in Kit (fifteen minutes), then the text-editor check on the Mac. The scheme works without it; this adds Shift to the ring finger and stop-cast to the index finger.'}
+];
+var NIGHT = [
+ {id:'n1',w:'Morning',t:'Open Battle.net, take the day-of update, let the CurseForge app update Polestar and Lucky\'s, confirm both are in the AddOns folder.'},
+ {id:'n2',w:'5:30 p.m.',t:'Power, mouse, water. Close the memory-heavy apps. Set the stop time in Kit and mean it.'},
+ {id:'n3',w:'6:00 p.m.',t:'Log in. A queue is normal. Kooala already exists from the 28 October reservation; pick her at character select.'},
+ {id:'n4',w:'In the queue',t:'Read the first ten steps of the Dun Morogh route on polestar.guide. Put this page on the phone. Decide the first five binds.'},
+ {id:'n5',w:'First 20 minutes',t:'Screenshot the character. Status Text on, camera distance up, text scale up. Do the eight setup steps in Kit (bars 2 and 3 on Shift and Option, pet bar unbound, autorun on wheel click, stop-cast on `), type in the heal macros, set Bar 1 to four rows in Edit Mode, drag spells onto the thumb slots. Confirm Polestar loaded; if it errors, disable it and use the quest log.'},
+ {id:'n6',w:'First two hours',t:'Coldridge Valley will be a wall of gnomes. Group the kill quests with strangers (shared credit) and heal them. Do item and exploration quests while the kill mobs are camped.'},
+ {id:'n7',w:'Stop time',t:'Reach an inn, log out, and write the log entry: level, build number, one thing that broke, one thing that was fun.'}
+];
+var BREAKS = [
+ ['Queue or disconnect','Re-queue. Do the Before Wednesday list or read the route. Queues move tasks forward; they do not create catch-up debt.'],
+ ['Addon error on login','Disable the addon, play the default UI, keep the error text and version for later. The quest log is a fine guide for Dun Morogh.'],
+ ['Addon settings gone after logout','Expected on the beta client. Macros and Blizzard keybinds live on the server; rebuild the addon layout once and treat it as disposable until it sticks.'],
+ ['Caps makes the thumb grid go blank','Lucky\'s paging. Edit Mode, Action Bar 1, Paging: set Ctrl to Off and Save. Keybinds are not the cause; the Blizzard list is clean.'],
+ ['Option or Cmd plus a Naga button loses the modifier','The Mac client\'s expose shim drops a modifier held on one device while the key comes from another. Quit WoW, run in Terminal: defaults write com.blizzard.worldofwarcraft disable-expose-fix -bool YES, then relaunch. Re-run after a fresh install or on a new Mac. Side effect: OS shortcuts such as Cmd+Q now reach the game, so turn on Disable OS Keyboard Shortcuts in Options as well. Confirmed working 5 November.'],
+ ['Guide step does not exist','Forever changed the quests. Do the nearest live quests, note the step in the log, move on.'],
+ ['Starting zone too crowded','Form a five-person group. Kill credit is shared and you are the healer, which makes you the most wanted player in the valley.'],
+ ['No dungeon group forming','Heal a quest hub instead: stand where people fight and shield them. Social, useful, and it tests the same buttons.'],
+ ['Dying repeatedly','Stop. Drink, bandage, check the gear slots on the Progress board, pull one at a time. A dead priest levels slowly.'],
+ ['Out of time','Log out at an inn wherever you are. Rested XP works in your favour tomorrow.']
+];
+var MILESTONES = [
+ {lv:1,what:'Smite, Lesser Heal, Power Word: Fortitude.',do:'Bind all three. Fortitude on everyone you pass; it is how priests say hello.'},
+ {lv:4,what:'Shadow Word: Pain.',do:'Open with it on anything that lives longer than two Smites.'},
+ {lv:5,what:'Shoot (wand skill).',do:'Get a wand as soon as you can, from a quest reward or the Ironforge auction house. Between 5 and 20 the wand is a priest\'s main damage tool.',tag:'Classic'},
+ {lv:6,what:'Power Word: Shield.',do:'Bind on F. Shield before the pull, not after the hit.'},
+ {lv:8,what:'Renew, Fade.',do:'Renew on R. Fade is the oh-no button in groups.'},
+ {lv:10,what:'First talent point. Mind Blast, Resurrection. Confounding Flash (up to five enemies confused for 3 s, 2 min cooldown).',do:'Spend the point on your chosen road. Ironforge trip: Tailoring and Enchanting trainers, bags, wand.',tag:'Forever'},
+ {lv:12,what:'Inner Fire.',do:'Keep it up while questing.',tag:'Classic'},
+ {lv:13,what:'Forever\'s new five-player dungeons start at 13.',do:'Nothing yet. The Legacy dungeon tier is 15 to 25.',tag:'Forever'},
+ {lv:14,what:'Psychic Scream, Cure Disease.',do:'Scream on X. Cure Disease on the dispel key.',tag:'Classic'},
+ {lv:15,what:'Dungeon tier one (15 to 25) counts for Legacy.',do:'First dungeon heal when a group forms. Say it is a fresh setup. Check mana before every pull.',tag:'Forever'},
+ {lv:16,what:'Heal, Mind Soothe.',do:'Heal replaces Lesser Heal on Q.',tag:'Classic'},
+ {lv:18,what:'Dispel Magic.',do:'On T. Dispelling is half of dungeon healing at this tier.',tag:'Classic'},
+ {lv:20,what:'Flash Heal. Holy Fire and Devouring Plague baseline. Contingency Plan class quest (a 30 s ward that triggers below 35% health). Mind Flay on the Shadow road.',do:'Flash Heal on E. Do the class quest the night you hit 20. Check which trades are at 20: each one is a camp feature.',tag:'Forever'},
+ {lv:25,what:'Legacy unlocks with the Priest class milestone. Sixteen talent points. Binding Heal rank 1 at the trainer (30 Oct datamine, Medium).',do:'Open Legacy (Y), read the live tree, screenshot it, then spend. Vampiric Embrace on the Shadow road.',tag:'Forever'},
+ {lv:26,what:'Dungeon tier two (26 to 45).',do:'A new final boss worth a Legacy point.',tag:'Forever'},
+ {lv:30,what:'Prayer of Healing, Divine Spirit. Penance if 21 Discipline points.',do:'The respec decision lives here: dungeons most nights means the Discipline bridge until 40; mostly solo means Shadow stays. The Kit has the rule.',tag:'Forever'},
+ {lv:32,what:'Shadow Word: Death.',do:'An execute. Bind it where you will not fat-finger it.',tag:'Forever'},
+ {lv:40,what:'31-point talent (Shadowform on the Shadow road). Dual spec at the class trainer. Mount.',do:'Week three or four. Dual spec ends the compromise: Shadow for solo, a healing tree for groups.',tag:'Forever'}
+];
+var DIMS = [
+ {k:'level',label:'Level',sub:'Kooala',max:60,marks:[10,15,20,25]},
+ {k:'talents',label:'Talent points spent',sub:'51 at 60',max:51,marks:[11,16,21,31]},
+ {k:'tailoring',label:'Tailoring',sub:'camp at 20, Legacy at 150',max:300,marks:[20,150,225]},
+ {k:'enchanting',label:'Enchanting',sub:'camp at 20, Legacy at 150',max:300,marks:[20,150,225]},
+ {k:'fishing',label:'Fishing',sub:'Fishing Bowl at 20',max:300,marks:[20]},
+ {k:'firstaid',label:'First Aid',sub:'First Aid Kit at 20',max:300,marks:[20]},
+ {k:'cooking',label:'Cooking',sub:'the campfire itself',max:300,marks:[20]},
+ {k:'legacyEarned',label:'Legacy earned',sub:'65 challenges',max:65,marks:[1,4]},
+ {k:'legacySpent',label:'Legacy spent',sub:'16 cap at launch',max:16,marks:[]},
+ {k:'flights',label:'Flight paths',sub:'Alliance, both continents',max:30,marks:[]},
+ {k:'gear',label:'Gear slots at green or better',sub:'of 17',max:17,marks:[]},
+ {k:'gold',label:'Gold',sub:'training, repairs, a wand',max:100,marks:[5,20]}
+];
+var CAMP = [
+ {k:'tailoring',name:'Faction Banner',buff:'14 to 32 Spirit for your faction',excl:'Divine Spirit'},
+ {k:'enchanting',name:'Enchanted Lute',buff:'armour, all stats, all resistances',excl:'Mark of the Wild'},
+ {k:'fishing',name:'Fishing Bowl',buff:'8% to all stats',excl:'Blessing of Kings'},
+ {k:'firstaid',name:'First Aid Kit',buff:'3 to 56 Stamina',excl:'Power Word: Fortitude'}
+];
+var ALTS = [['walaroo','Walaroo','Human Warlock, Affliction'],['quookka','Quookka','Skyborne Druid, Restoration'],['woombat','Woombat','Dwarf Shaman, Restoration'],['mars','Mars','Human Paladin, Holy'],['bandicoot','Bandicoot','Night Elf Hunter'],['oopossum','Oopossum','Gnome Mage'],['bank','Bank','Rogue, the bank alt; stays level 1']];
+var FEEL = {healers:[['kooala','Kooala','Priest'],['quookka','Quookka','Druid'],['woombat','Woombat','Shaman']],dims:[['dec','Decisions'],['mov','Movement'],['mana','Mana pacing'],['util','Utility'],['fun','Secondary fun']]};
+var DECISIONS = [
+ {k:'preset',label:'Experience preset',opts:['Enhanced','Classic'],note:'Enhanced turns on quest markers, one-bag and strafe keys. Everything in it can be changed later under Options. Chosen at first login, which for the reserved three was 28 October.'},
+ {k:'ruleset',label:'Ruleset (the one you picked on 28 October)',opts:['Normal','PvP','Roleplay','Roleplay PvP'],note:'Grouping, guilds, dungeons and raids work only within one ruleset and faction. All eight Marsoopials are on it now.'},
+ {k:'road',label:'Level-10 road',opts:['Shadow','Discipline'],note:'See the card below. Shadow is the recommendation for a levelling week.'},
+ {k:'stop',label:'Launch-night stop time',type:'time',note:'Launch night runs on adrenaline and Thursday is a work day.'},
+ {k:'bar3',label:'Bar 3 modifier (the out-of-combat thumb layer)',opts:['Cmd','Option'],note:'The Kit says Option; your live bindings say Cmd (META-1 to META-=, read by Scribe on 6 November). Both work once the expose fix is in. This decides what Scribe installs and checks.'}
+];
+var SETTINGS = [
+ {id:'s1',t:'Status Text: Options, Gameplay, Interface, Display, Status Text. Show numbers on health and mana bars. Blizzard ships it off, and a healer wants numbers.'},
+ {id:'s2',t:'Camera: max distance all the way up. Zoom out in dungeons so you see the room, not the gnome.'},
+ {id:'s3',t:'Text and UI scale up a notch on the built-in display; the MacBook screen is sharp but small.'},
+ {id:'s4',t:'Graphics: leave the preset\'s defaults. Change one thing only if Ironforge stutters, and change render scale first.'},
+ {id:'s5',t:'Nameplates, My Secondary Name: hide it in the world if the double name bothers you. It still shows in chat.'}
+];
+var GRID = {
+ rest:[1,2,4,5,7,8],
+ layers:[
+  {k:'base',label:'Thumb',mod:'',bar:'Action Bar 1 (already bound to 1 through =)',blurb:'Up is friendly, down is hostile. Rows one and two heal, rows three and four hurt. Nothing that happens in combat needs a modifier.',slots:[
+   ['Flash Heal','quick heal; Lesser Heal R1 until 20'],['Renew','HoT'],['Fade','threat drop'],
+   ['Heal','efficient; Lesser Heal until 16'],['Power Word: Shield','the button'],['Penance / Binding Heal','the talent heal, 25 to 30'],
+   ['Smite','filler'],['Shadow Word: Pain','opener'],['Mind Blast','burst'],
+   ['Shoot','wand, from 5'],['Mind Flay / Holy Fire','at 20'],['Devouring Plague','at 20; SW:Death at 32']]},
+  {k:'ctrl',label:'Caps (Ctrl)',mod:'Caps+',bar:'same slots, cast on yourself',blurb:'Hold Caps and any heal targets you. One macro per heal does it, so there is nothing extra to bind. Needs the pet bar unbound (setup step 3).',slots:[
+   ['Flash Heal','on yourself'],['Renew','on yourself'],['Fade','no change'],
+   ['Heal','on yourself'],['Power Word: Shield','on yourself'],['Penance / Binding Heal','on yourself'],
+   ['Smite','no change'],['Shadow Word: Pain','no change'],['Mind Blast','no change'],
+   ['Shoot','no change'],['Mind Flay / Holy Fire','no change'],['Devouring Plague','no change']]},
+  {k:'shift',label:'Shift',mod:'Shift+',bar:'Action Bar 2 (bind it to Shift+1 through Shift+=)',blurb:'Utility: dispels, panic buttons, buffs and the resurrection. Panic sits on the easy buttons.',slots:[
+   ['Dispel Magic','18, mouseover'],['Cure Disease','14, mouseover'],['Confounding Flash','10'],
+   ['Psychic Scream','14'],['Power Word: Fortitude','mouseover buff'],['Resurrection','10, mouseover'],
+   ['Inner Fire','12'],['Divine Spirit','30'],['Prayer of Healing','30'],
+   ['Contingency Plan','20, if it is an activated ward'],['Mind Soothe','16'],['Shadowform','40']]},
+  {k:'alt',label:'Option',mod:'Option+',bar:'Action Bar 3 (bind it to Option+1 through Option+=)',blurb:'Out of combat. Things you press once a session.',slots:[
+   ['Hearthstone',''],['Food',''],['Drink',''],
+   ['Bandage','First Aid'],['Campfire','Cooking'],['Fishing',''],
+   ['Shackle Undead','20'],['Levitate','34'],['Mind Vision',''],
+   ['Mount','40'],['',''],['','']]}
+ ]
+};
+var KEYS = [
+ ['Caps Lock (Ctrl)','Self-cast modifier','Hold with any heal to cast it on yourself. Your pinky already lives there.'],
+ ['Shift','Utility layer','Action Bar 2: dispels, panic, buffs, res.'],
+ ['Option (Alt)','Out-of-combat layer','Action Bar 3: hearth, food, drink, camp, fishing.'],
+ ['Cmd','Nothing','Cmd+Tab and Cmd+Q are live in macOS. Leave it unbound.'],
+ ['`','Stop casting','Your old tilde habit, repurposed: one flick cancels the cast.'],
+ ['W A S D','Move','Enhanced preset strafes on A and D. Turn with the mouse.'],
+ ['Space','Jump','Default.'],
+ ['Tab / Shift+Tab','Next / previous enemy','Default.'],
+ ['F1 to F5','Target self, party 1 to 4','Default; a fallback until mouseover feels natural.'],
+ ['Q','Assist (target of target)','Hit what the tank hits.'],
+ ['E','Target nearest friendly','For the valley group.'],
+ ['F','Follow target','Dungeon travel on autopilot.'],
+ ['Wheel click','Toggle autorun','Your old habit, kept.'],
+ ['Ring-finger button','Shift (after the Windows pass)','The Shift grid one-handed: ring finger holds, thumb presses, left hand keeps moving.'],
+ ['Left tilt','Stop casting (after the Windows pass)','Index-finger cancel; the ` key does the same.'],
+ ['Right tilt','Push-to-talk or Psychic Scream (after the Windows pass)','Your call. F13 for Discord, or X for the scream.'],
+ ['Wheel','Camera zoom','Default.']
+];
+var SETUP = [
+ {id:'k1',t:'Key Bindings, Action Bar 2: buttons 1 to 12 on Shift+1 through Shift+=. This replaces the default Action Page binds.'},
+ {id:'k2',t:'Key Bindings, Action Bar 3: buttons 1 to 12 on Option+1 through Option+=.'},
+ {id:'k3',t:'Key Bindings, Pet Bar: unbind Ctrl+1 through Ctrl+0. Keybinds beat macro modifiers, so until this is done Caps does nothing.'},
+ {id:'k4',t:'Key Bindings, Toggle Autorun: wheel click. Follow Target: F. Assist Target: Q. Target Nearest Friend: E.'},
+ {id:'k5',t:'Put the stop-casting macro on a spare slot and bind that slot to `.'},
+ {id:'k6',t:'Type the heal macros into the Macro window on launch night. They live on the server, so they survive the beta client losing addon settings.'},
+ {id:'k7',t:'If Caps is Escape-on-tap (the Karabiner vim trick), add a WoW exception. A tap opens the game menu mid-fight.'},
+ {id:'k8',t:'macOS Accessibility: if "Use scroll gesture with modifier keys to zoom" is on, Ctrl+wheel goes to the OS, not the game.'},
+ {id:'k9',t:'System Settings, Mouse, Advanced: Pointer acceleration off, and the tracking-speed slider to the middle. Speed comes from the DPI stage, which is linear; the macOS slider is a curve a hand cannot learn. Check: a slow inch and a fast inch land in the same place.'}
+];
+var SCREEN = [
+ {id:'e1',t:'Edit Mode (Esc, or right-click your portrait): New Layout from the Centralized preset, named Kooala. Presets are read-only.'},
+ {id:'e2',t:'Action Bar 1: horizontal, 4 rows, 12 icons, Hide Bar Art, Hide Bar Scrolling, Always Show Buttons. Drag it under the player frame, just left of centre.'},
+ {id:'e3',t:'Options, Action Bars: turn on Action Bar 2 and 3. Bar 2: same 4-row shape, one icon size smaller, right of Bar 1. Bar 3: one row, smallest, along the bottom edge.'},
+ {id:'e4',t:'Party Frames in Edit Mode: raid-style frames on, placed left of Bar 1 at the same height. Cast bar under the player frame. Target frame above it.'},
+ {id:'e5',t:'Check the row order before trusting the block. Without Lucky\'s, stock Edit Mode stacks rows upward and thumb row 1 (Flash Heal, Renew, Fade) draws at the bottom. The flip chip in the thumb-grid card shows what that looks like.'},
+ {id:'e6',t:'Lucky\'s Actionbars is in. In Edit Mode select Bar 1, set Rows Grow to Down, then the same on Bar 2. Button 1 sits top-left, matching the mouse.'},
+ {id:'e6b',t:'Lucky\'s Paging, per bar: open Action Bar 1, press Paging, and set Ctrl, Alt and Shift all to Off. Lucky\'s defaults Ctrl to "Action Bar 1, page 2", which swaps the thumb grid for an empty page whenever Caps is held and swallows the self-cast. Found on launch night (5 Nov). Check it on every alt\'s layout, since the default returns with a new layout.'},
+ {id:'e7',t:'Keybind text on, so the thumb grid shows 1 to = and the Shift grid shows s1 to s=. Turn it off once the thumb stops needing it.'}
+];
+var SYNAPSE = [
+ {id:'w1',t:'On the Windows machine, connect the mouse by the 2.4 GHz dongle or the USB-C cable, not Bluetooth. Open Synapse 4, make a new profile called Forever.'},
+ {id:'w2',t:'Thumb grid: leave every button at Default. It already sends 1 to =, which is Action Bar 1, and the keyboard number row stays a fallback.'},
+ {id:'w3',t:'Ring-finger button: Keyboard Function, Left Shift. Ring finger plus thumb is the Shift grid one-handed, and the left hand keeps moving. If the grip feels wrong after a session, lock the button off with its toggle and use keyboard Shift.'},
+ {id:'w4',t:'Left tilt-click: Keyboard Function, ` (grave). Stop casting under the index finger. Right tilt-click: F13 for Discord push-to-talk if you use voice, otherwise X for Psychic Scream.'},
+ {id:'w5',t:'AI Prompt button: Disable, until you know where it sits and whether the thumb brushes it. DPI edge buttons: set a single DPI stage at your number, so an accidental press changes nothing. Coming from a trackpad there is nothing to match, so start at 3200 and adjust once; high is fine, constant is the point. Polling 1000 Hz.'},
+ {id:'w6',t:'No Razer macros. WoW macros do that job, on-board macro support varies by device, and Synapse 4 has an open bug where stored macros loop without Synapse running.'},
+ {id:'w7',t:'Save: click the memory-card icon, drag the Forever profile into on-board slot 1, leave the other slots empty so the profile button on the base cannot land anywhere else. Lighting is not stored, which does not matter.'},
+ {id:'w8',t:'Verify on the Mac in a text editor: thumb buttons type 1 through =, left tilt types `, ring finger plus thumb 1 types !. Then it is done, and Synapse never runs again.'}
+];
+var MACROS = [
+ {n:'Heal template (Caps casts on you)',template:true,m:'#showtooltip\n/cast [mod:ctrl,@player][@mouseover,help,nodead][help,nodead][@player] SPELL',note:'Friendly mouseover first, then friendly target, then yourself; Caps forces yourself. Replace SPELL from the spellbook. Test on yourself, a party frame and an out-of-range target before a dungeon.'},
+ {n:'Power Word: Shield',name:'PW: Shield',m:'#showtooltip\n/cast [mod:ctrl,@player][@mouseover,help,nodead][help,nodead][@player] Power Word: Shield',note:'Thumb 5.'},
+ {n:'Renew',m:'#showtooltip\n/cast [mod:ctrl,@player][@mouseover,help,nodead][help,nodead][@player] Renew',note:'Thumb 2.'},
+ {n:'Heal',m:'#showtooltip\n/cast [mod:ctrl,@player][@mouseover,help,nodead][help,nodead][@player] Lesser Heal',note:'Thumb 4. Swap Lesser Heal for Heal at 16; the key stays.'},
+ {n:'Flash Heal',m:'#showtooltip\n/cast [mod:ctrl,@player][@mouseover,help,nodead][help,nodead][@player] Flash Heal',note:'Thumb 1 from 20. Before that put Lesser Heal (Rank 1) there as the cheap quick heal.'},
+ {n:'Power Word: Fortitude',name:'PW: Fortitude',m:'#showtooltip\n/cast [@mouseover,help,nodead][help,nodead][@player] Power Word: Fortitude',note:'Shift+5. Hover anyone, press, friend for life.'},
+ {n:'Resurrection',m:'#showtooltip\n/cast [@mouseover,help,dead][help,dead] Resurrection',note:'Shift+6. Only fires on a dead friendly, so it cannot waste a cast.'},
+ {n:'Dispel Magic',m:'#showtooltip\n/cast [mod:ctrl,@player][@mouseover,help,nodead][help,nodead][@player] Dispel Magic',note:'Shift+1 from 18. Cure Disease on Shift+2 uses the same shape.'},
+ {n:'Cure Disease',m:'#showtooltip\n/cast [mod:ctrl,@player][@mouseover,help,nodead][help,nodead][@player] Cure Disease',note:'Shift+2 from 14. The same shape as Dispel Magic.'},
+ {n:'Stop casting',m:'/stopcasting',note:'On `. Never in front of a heal; it would clip a Penance channel later.'},
+ {n:'Drinking',m:'/p Drinking. Give me ten seconds before the pull.',note:'Say it before they pull, not after.'}
+];
+var SOURCES = [
+ ['Lore Forever, Kooala\'s automatic journey log (addon profile)','https://loreforeverwow.com/u/kooala'],
+ ['Mobalytics, Discipline Priest guide (levelling and dungeon healing in one tree)','https://mobalytics.gg/wow-forever/classes/discipline-priest-guide-progress'],
+ ['Icy Veins, Shadow Priest (Forever): healing dungeons before Shadowform','https://www.icy-veins.com/wow-forever/shadow-priest-ranged-dps-pve-guide'],
+ ['Talents Forever, fan-made calculator from the live build; the ladder as a build link','https://talentsforever.com/priest/60/02--305021012-l2Blnjqro-12?b=70755h&d=261106'],
+ ['Hall of Thanes (levels 13 to 18, under Ironforge): bosses, loot, quests','https://wowforeverguides.com/dungeons/hall-of-thanes'],
+ ['Armory, Kooala Marsoopial (live gear, talents, professions)','https://worldofwarcraft.blizzard.com/en-us/forever/us/armory/character/kooala-marsoopial'],
+ ['Blizzard, global launch 4 November','https://news.blizzard.com/en-gb/article/24315820/world-of-warcraft-forever-goes-live-globally-4-november'],
+ ['Blizzard, starter guide (presets, rulesets, names, professions)','https://news.blizzard.com/en-us/article/24315280/new-players-starter-guide-welcome-to-world-of-warcraft-forever'],
+ ['Blizzard, Legacy system','https://news.blizzard.com/en-us/article/24307383/get-to-know-the-world-of-warcraft-forever-legacy-system'],
+ ['Blizzard, Camping','https://news.blizzard.com/en-us/article/24301516/gather-around-the-campfire-in-world-of-warcraft-forever'],
+ ['Blizzard, Priest and Warrior deep dive','https://news.blizzard.com/en-us/article/24301514/world-of-warcraft-forever-class-deep-dives-priest-and-warrior'],
+ ['Blizzard, raid overview and attunement','https://news.blizzard.com/en-gb/article/24303009/world-of-warcraft-forever-raid-overviewlocations-raid-sizes-and-attunement'],
+ ['Razer, Naga V3 Pro support and FAQs (not supported in Synapse for Mac; plug-and-play)','https://mysupport.razer.com/app/answers/detail/a_id/21025'],
+ ['Lucky\'s Actionbars on CurseForge (Rows Grow setting)','https://www.curseforge.com/wow/addons/luckys-actionbars'],
+ ['Razer, what on-board memory stores','https://mysupport.razer.com/app/answers/detail/a_id/15079'],
+ ['Razer, saving a profile to on-board memory in Synapse 4','https://mysupport.razer.com/app/answers/detail/a_id/13863'],
+ ['Razer Insider, configuring the V3 Pro on Windows for a Mac','https://insider.razer.com/razer-synapse-for-mac-preview-61/how-i-m-getting-my-new-razer-naga-v3-pro-to-work-on-my-mac-90716'],
+ ['Polestar on CurseForge','https://www.curseforge.com/wow/addons/polestar'],
+ ['Polestar guide library','https://polestar.guide/guides'],
+ ['HealKit on CurseForge','https://www.curseforge.com/wow/addons/healkit'],
+ ['Four Roads planner (the Priest page this draws on)','https://four-roads-forever.kormie.chatgpt.site/'],
+ ['Addon sandbox reports: BiS>Healing, ForeverMeter, Vitals on CurseForge','https://www.curseforge.com/wow/addons/vitals']
+];
+return {LAUNCH:LAUNCH,DAYS:DAYS,PACE:PACE,PRE:PRE,NIGHT:NIGHT,BREAKS:BREAKS,MILESTONES:MILESTONES,DIMS:DIMS,CAMP:CAMP,ALTS:ALTS,FEEL:FEEL,DECISIONS:DECISIONS,SETTINGS:SETTINGS,MACROS:MACROS,SOURCES:SOURCES,GRID:GRID,KEYS:KEYS,SETUP:SETUP,SCREEN:SCREEN,SYNAPSE:SYNAPSE};
+})();
+</script>
+<script>
+(function(){
+"use strict";
+var P = window.P, $ = function(id){ return document.getElementById(id); };
+var KEY = 'pouch.v1';
+var VIEWS = ['now','week','progress','kit','log'];
+var dimKeys = P.DIMS.map(function(d){return d.k;}).filter(function(k){return k!=='level';});
+
+function listOf(v){ if(Array.isArray(v)) return v.map(String); if(v&&typeof v==='object') return Object.keys(v).map(function(k){ return String(v[k]); }); return []; }
+function fresh(){
+  var s = {v:1, level:1, minutes:60, mood:'push', hours:{}, checks:{}, dims:{}, alts:{}, feel:{}, decisions:{preset:'Enhanced',ruleset:'',road:'Shadow',stop:'23:00',bar3:'Cmd'}, log:[], updated:0};
+  P.DAYS.forEach(function(d){ s.hours[d.k]=d.def; });
+  dimKeys.forEach(function(k){ s.dims[k]=0; });
+  P.ALTS.forEach(function(a){ s.alts[a[0]]=0; });
+  P.FEEL.healers.forEach(function(h){ s.feel[h[0]]={}; P.FEEL.dims.forEach(function(d){ s.feel[h[0]][d[0]]=0; }); });
+  return s;
+}
+function merge(base, inc){
+  if(!inc || typeof inc!=='object') return base;
+  var s = fresh();
+  ['level','minutes','mood','updated'].forEach(function(k){ if(inc[k]!==undefined) s[k]=inc[k]; });
+  ['hours','checks','dims','alts','decisions'].forEach(function(k){ if(inc[k]&&typeof inc[k]==='object') Object.keys(inc[k]).forEach(function(j){ s[k][j]=inc[k][j]; }); });
+  if(inc.feel) Object.keys(inc.feel).forEach(function(h){ if(s.feel[h]) Object.keys(inc.feel[h]).forEach(function(d){ s.feel[h][d]=inc.feel[h][d]; }); });
+  if(Array.isArray(inc.log)) s.log = inc.log.filter(function(e){ return e && typeof e==='object'; }).map(function(e){ var o={d:String(e.d||''),level:Number(e.level)||0,hours:Number(e.hours)||0,build:String(e.build||''),broke:String(e.broke||''),fun:String(e.fun||'')}; if(e.src==='scribe'){ o.src='scribe'; o.key=String(e.key||''); o.deaths=Number(e.deaths)||0; o.quests=Number(e.quests)||0; o.dungeons=listOf(e.dungeons); o.spec=String(e.spec||''); o.feel=(e.feel&&typeof e.feel==='object')?e.feel:{}; } return o; });
+  s.level = Math.min(60, Math.max(1, Number(s.level)||1));
+  return s;
+}
+var state = fresh();
+try { var raw = localStorage.getItem(KEY); if(raw) state = merge(state, JSON.parse(raw)); } catch(e){}
+
+var remote = {db:null, doc:null, lastWritten:0, timer:null};
+function persist(){
+  state.updated = Date.now();
+  try { localStorage.setItem(KEY, JSON.stringify(state)); } catch(e){}
+  if(remote.doc){ clearTimeout(remote.timer); remote.timer = setTimeout(pushRemote, 1500); }
+}
+function pushRemote(){
+  if(!remote.doc || state.updated<=remote.lastWritten) return;
+  var stamp = state.updated;
+  Promise.resolve(remote.doc.set(JSON.parse(JSON.stringify(state)))).then(function(){ remote.lastWritten=stamp; setSync('synced','Synced to your account'); }).catch(function(){ setSync('local','Saved on this device'); });
+}
+function setSync(s,t){ $('sync').dataset.s=s; $('syncText').textContent=t; }
+function unwrap(snap){ if(!snap) return null; if(typeof snap.data==='function'){ try{ return snap.exists===false?null:snap.data(); }catch(e){ return null; } } return snap; }
+function adoptRemote(data){
+  var d = unwrap(data); if(!d || typeof d!=='object') return;
+  if((Number(d.updated)||0) > (state.updated||0)){ state = merge(state, d); try{ localStorage.setItem(KEY, JSON.stringify(state)); }catch(e){} remote.lastWritten = state.updated; renderAll(); }
+}
+/* GitHub Pages mirror: with no artifact runtime, the state the courier
+   committed beside this file is the account copy. adoptRemote keeps the
+   newer `updated`, same as the database path. A plain file:// open or a
+   missing state.json leaves the page standalone. */
+function mirror(){
+  if(location.protocol==='file:' || typeof fetch!=='function') return;
+  fetch('state.json?t='+Date.now(),{cache:'no-store'}).then(function(r){ if(!r.ok) throw new Error(String(r.status)); return r.json(); }).then(function(d){
+    if(!d || typeof d!=='object') return;
+    adoptRemote(d);
+    var at=new Date(Number(d.updated)||Date.now());
+    setSync('mirror','Mirror, refreshed '+at.toLocaleString('en-CA',{weekday:'short',hour:'numeric',minute:'2-digit',timeZone:'America/New_York'})+' EST');
+    $('mirrorNote').hidden=false;
+  }).catch(function(){});
+}
+(function connect(){
+  if(!window.claude || typeof window.claude.use!=='function'){ mirror(); return; }
+  var done=false, t=setTimeout(function(){ if(!done){ done=true; } },10000);
+  window.claude.use('db').then(function(db){
+    clearTimeout(t); if(done&&!db) return; done=true;
+    if(!db){ setSync('local','Saved on this device'); return; }
+    remote.db=db; remote.doc=db.doc('state/main');
+    Promise.resolve(remote.doc.get()).then(function(snap){ adoptRemote(snap); setSync('synced','Synced to your account'); if(state.updated>remote.lastWritten) pushRemote(); }).catch(function(){ setSync('local','Saved on this device'); });
+    try { remote.doc.onSnapshot(function(snap){ adoptRemote(snap); }); } catch(e){}
+  }).catch(function(){});
+})();
+
+/* pace */
+function hoursTo(level){
+  var p=P.PACE; if(level<=p[0][0]) return 0;
+  for(var i=1;i<p.length;i++){ if(level<=p[i][0]){ var a=p[i-1],b=p[i]; return a[1]+(b[1]-a[1])*(level-a[0])/(b[0]-a[0]); } }
+  return p[p.length-1][1];
+}
+function levelAt(h){
+  var p=P.PACE; if(h<=0) return 1;
+  for(var i=1;i<p.length;i++){ if(h<=p[i][1]){ var a=p[i-1],b=p[i]; return a[0]+(b[0]-a[0])*(h-a[1])/(b[1]-a[1]); } }
+  return 60;
+}
+function logSorted(){ return state.log.slice().sort(function(a,b){ return a.d<b.d?-1:a.d>b.d?1:0; }); }
+function calibration(){
+  var L=logSorted().filter(function(e){ return e.level>1 && e.hours>0; });
+  if(L.length<2) return {f:1, n:L.length};
+  var hrs=0; L.forEach(function(e){ hrs+=e.hours; });
+  var last=L[L.length-1]; var model=hoursTo(last.level);
+  if(hrs<=0||model<=0) return {f:1,n:L.length};
+  return {f:Math.min(2.5,Math.max(0.4,model/hrs)), n:L.length};
+}
+function projection(){
+  var cal=calibration(), L=logSorted(), byDate={};
+  L.forEach(function(e){ byDate[e.d]=e; });
+  var anchorLevel=1, anchorIdx=-1;
+  P.DAYS.forEach(function(d,i){ if(byDate[d.date]){ anchorLevel=byDate[d.date].level; anchorIdx=i; } });
+  var h=hoursTo(anchorLevel), out=[];
+  P.DAYS.forEach(function(d,i){
+    if(i<=anchorIdx && byDate[d.date]){ out.push({day:d,level:byDate[d.date].level,logged:true}); return; }
+    h += (Number(state.hours[d.k])||0)*cal.f;
+    out.push({day:d,level:levelAt(h),logged:false});
+  });
+  return {rows:out,cal:cal};
+}
+
+/* helpers */
+function el(tag,cls,text){ var e=document.createElement(tag); if(cls) e.className=cls; if(text!==undefined) e.textContent=text; return e; }
+function toast(t){ var x=$('toast'); x.textContent=t; x.classList.add('on'); clearTimeout(toast.t); toast.t=setTimeout(function(){ x.classList.remove('on'); },1800); }
+function copyText(text,cb){
+  var done=function(ok){ cb&&cb(ok); };
+  try{ if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(text).then(function(){done(true);},function(){done(fallback());}); return; } }catch(e){}
+  done(fallback());
+  function fallback(){ try{ var ta=document.createElement('textarea'); ta.value=text; ta.style.position='fixed'; ta.style.opacity='0'; document.body.appendChild(ta); ta.select(); var ok=document.execCommand('copy'); document.body.removeChild(ta); return ok; }catch(e){ return false; } }
+}
+function checklist(container, items, keyPrefix){
+  container.replaceChildren();
+  items.forEach(function(it){
+    var id=keyPrefix+':'+it.id, li=el('li'), cb=el('input'), lab=el('label');
+    cb.type='checkbox'; cb.id='cb-'+id; cb.checked=!!state.checks[id]; lab.htmlFor=cb.id;
+    if(it.w){ var w=el('span','when',it.w); lab.appendChild(w); }
+    lab.appendChild(document.createTextNode(it.t));
+    if(cb.checked) li.classList.add('done');
+    cb.addEventListener('change',function(){ state.checks[id]=cb.checked; li.classList.toggle('done',cb.checked); persist(); renderCounts(); });
+    li.appendChild(cb); li.appendChild(lab); container.appendChild(li);
+  });
+}
+function renderCounts(){
+  var n=P.PRE.filter(function(it){ return state.checks['pre:'+it.id]; }).length;
+  $('preCount').textContent = n+' of '+P.PRE.length+' done';
+}
+
+/* NOW */
+function fmtClock(){ var n=new Date(); return n.toLocaleString('en-CA',{weekday:'short',hour:'numeric',minute:'2-digit',timeZone:'America/New_York'})+' EST'; }
+function renderCountdown(){
+  var now=Date.now(), diff=P.LAUNCH-now, cd=$('countdown'), pill=$('phasePill'), line=$('phaseLine');
+  $('nowClock').textContent=fmtClock();
+  cd.replaceChildren();
+  if(diff>0){
+    var d=Math.floor(diff/864e5), h=Math.floor(diff%864e5/36e5), m=Math.floor(diff%36e5/6e4);
+    cd.appendChild(document.createTextNode(d+'d '+h+'h '+m+'m'));
+    var s=el('small','', 'until Wednesday 4 November, 6:00 p.m. EST. The reserved three already exist; launch night is about getting in and getting comfortable.');
+    cd.appendChild(s); pill.textContent='Before launch'; line.textContent='Work the Before Wednesday list below. The session planner is live now if you want to rehearse it.';
+    orderNow(true);
+  } else {
+    var dayN=Math.floor((now-P.LAUNCH+5*36e5)/864e5)+1; // day boundary at 1:00 a.m. EST
+    var dayObj=P.DAYS[Math.min(P.DAYS.length-1,Math.max(0,dayN-1))];
+    if(dayN<=7){ cd.appendChild(document.createTextNode('Day '+dayN+' of 7')); cd.appendChild(el('small','',dayObj.title+'. '+dayObj.body)); pill.textContent=dayObj.label+' · '+dayObj.title; }
+    else { cd.appendChild(document.createTextNode('Launch week is done')); cd.appendChild(el('small','','Pouch keeps working. The Week tab becomes a record; the Progress and Log tabs carry on.')); pill.textContent='After the week'; }
+    line.textContent='';
+    orderNow(false);
+  }
+}
+function orderNow(before){
+  var v=$('v-now'), c=$('countCard'), s=$('sessionCard'), p=$('prelaunchCard'), n=$('launchNightCard');
+  if(before){ v.insertBefore(c,v.firstElementChild.nextSibling); v.insertBefore(p,s); v.insertBefore(n,s); }
+  else { v.insertBefore(c,v.firstElementChild.nextSibling); v.insertBefore(s,c.nextSibling); if(n.previousElementSibling!==s) v.insertBefore(n,p); }
+}
+function suggest(level,mins,mood){
+  var out=[];
+  var push=[], chill=[], social=[], chores=[];
+  if(level<10) push.push(['Group the kill quests','Five strangers, shared credit, you heal. Solo the item and exploration quests while the kill mobs are camped. Follow Polestar; skip a broken step and note it.']);
+  else if(level<15) push.push(['Quest loop toward 15','The dungeon tier opens at 15. One Ironforge trip for Tailoring, Enchanting, a wand and bags; do it when the bags are full, not before.']);
+  else if(level<20) push.push([mins>=90?'Heal a tier-one dungeon':'Quest loop; dungeon needs 90 minutes', mins>=90?'Ask for the healer slot. Say it is a fresh setup, check mana before every pull, Fortitude on everyone. Score the feel test afterwards.':'Keep questing toward 20. Save the dungeon for a block with 90 minutes in it.']);
+  else if(level<25) push.push(['Push to 25 for Legacy','Contingency Plan class quest first if it is still open, then connected quests. Flash Heal on E, Holy Fire on 3.']);
+  else if(level<30) push.push(['Tier-two dungeons and the respec question','Dungeon tier two runs 26 to 45. Decide whether Penance at 30 is worth the respec before you spend the next point.']);
+  else push.push(['Keep the loop','Follow live quest chains. Guide coverage past 30 is thin; the quest log is the guide.']);
+  push.push(['Bind as you learn','New spell, new key, same job: 5 is always the shield. Cast it on yourself once before the next pull so the bind is proven, not assumed.']);
+  push.push(['Next milestone first','Whatever the next milestone card says is the thing to aim the session at. Everything else is a stop on the way.']);
+
+  chill.push([state.dims.fishing<20?'Fish toward 20':'Fish for the cooking pot', state.dims.fishing<20?'Fishing 20 is the Fishing Bowl: 8% to all stats at any campfire. Ten minutes by any water on the way to a quest.':'Cook what you catch. Food buffs are cheap gear.']);
+  chill.push(['Explore for flight paths','Every flight master you touch is a chore removed from a future session.']);
+  chill.push(['Sit at someone\'s camp','One minute at a stranger\'s fire for their buffs. Contribute if a trade is at 20.']);
+
+  if(level<15) social.push(['Form the valley group','Kill quests go five times faster in a group, and a priest is the recruit everyone wants. Fortitude is the handshake.']);
+  else social.push(['Find a dungeon group','Say it is a fresh Forever setup. Check mana before pulls, shield the tank on the pull, Renew on whoever the mob changes its mind about.']);
+  social.push(['Heal a quest hub','Stand where people fight and shield them. Social, useful, and it tests the same buttons as a dungeon.']);
+  social.push(['Camp with the group','After a run, build a fire. Three features, one minute sitting, an hour of buffs.']);
+
+  chores.push(['Town visit','Train spells, repair, clear bags, restock water, check the auction house for a wand or bags. Batch it; one trip.']);
+  chores.push(['Bank alt, one test mail','Create it on the same ruleset, send one item, confirm it arrives, then stop.']);
+  chores.push(['Park an alt at an inn','Rested experience accrues while you are not playing them. Do not level them tonight.']);
+
+  var pick = mood==='push'?push:mood==='chill'?chill:mood==='social'?social:chores;
+  if(mins<=30 && mood!=='chores'){ out.push(['A 30-minute block is a town visit','Train, repair, bags, mail. A quest loop needs an hour to pay off; save the push for one.']); out=out.concat(chores.slice(0,2)); }
+  else if(mins>=240){ out=out.concat(pick.slice(0,2)); out.push(['Big block order','Dungeon or the hardest thing first while energy is high, quest loop in the middle, chores and fishing last. One break per ninety minutes.']); }
+  else out=pick.slice(0,3);
+  return out;
+}
+function renderSession(){
+  $('lvOut').textContent=state.level;
+  document.querySelectorAll('#minsChips .chip').forEach(function(b){ b.setAttribute('aria-pressed',String(Number(b.dataset.m)===state.minutes)); });
+  document.querySelectorAll('#moodChips .chip').forEach(function(b){ b.setAttribute('aria-pressed',String(b.dataset.mood===state.mood)); });
+  var box=$('suggestions'); box.replaceChildren();
+  suggest(state.level,state.minutes,state.mood).forEach(function(s){ var d=el('div','sugg'); d.appendChild(el('h3','',s[0])); d.appendChild(el('p','',s[1])); box.appendChild(d); });
+  var nm=P.MILESTONES.filter(function(m){ return m.lv>state.level; })[0], nx=$('nextMs'); nx.replaceChildren();
+  if(nm){ var cal=calibration(); var eta=(hoursTo(nm.lv)-hoursTo(state.level))/cal.f; nx.appendChild(el('span','big',String(nm.lv))); var t=el('div'); t.appendChild(el('b','','Next: '+nm.what)); t.appendChild(el('p','small','About '+(eta<1?Math.max(10,Math.round(eta*60))+' minutes':eta.toFixed(1)+' hours')+' of play away'+(cal.n>=2?' at your logged pace.':' on the Classic model.')+' '+nm.do)); nx.appendChild(t); }
+  var st=state.decisions.stop; $('stopLine').textContent = st?('Stop time tonight: '+st+'. Reach an inn five minutes before.'):'No stop time set. Kit tab, Decisions.';
+}
+function renderBreaks(){ var b=$('breaks'); b.replaceChildren(); P.BREAKS.forEach(function(x){ var d=el('details'); var s=el('summary','',x[0]); d.appendChild(s); d.appendChild(el('p','small',x[1])); b.appendChild(d); }); }
+
+/* WEEK */
+function renderWeek(){
+  var days=$('days'); days.replaceChildren(); var pr=projection(); var today=new Date().toLocaleDateString('en-CA',{timeZone:'America/New_York'});
+  P.DAYS.forEach(function(d,i){
+    var box=el('div','day'); if(d.date===today) box.classList.add('today');
+    box.appendChild(el('b','',d.label)); box.appendChild(el('small','',d.title));
+    var inp=el('input'); inp.type='number'; inp.min='0'; inp.max='16'; inp.step='0.5'; inp.value=state.hours[d.k]; inp.setAttribute('aria-label','Hours on '+d.label); inp.inputMode='decimal';
+    inp.addEventListener('change',function(){ state.hours[d.k]=Math.max(0,Number(inp.value)||0); persist(); renderWeek(); renderSession(); });
+    box.appendChild(inp);
+    var r=pr.rows[i]; box.appendChild(el('div','proj',(r.logged?'logged ':'about level ')+Math.round(r.level)));
+    days.appendChild(box);
+  });
+  var total=0; P.DAYS.forEach(function(d){ total+=Number(state.hours[d.k])||0; });
+  var last=pr.rows[pr.rows.length-1];
+  $('projCap').textContent = total.toFixed(1)+' hours across the week puts Kooala near level '+Math.round(last.level)+' by Tuesday night'+(pr.cal.n>=2?', at your logged pace ('+(pr.cal.f>1?'faster':'slower')+' than the model by '+Math.round(Math.abs(pr.cal.f-1)*100)+'%).':' on the Classic model.')+(last.level<25?' Legacy at 25 is a week-two event unless the weekend runs long.':' Legacy at 25 lands inside the week.')+' Line: projected. Dots: logged.';
+  drawProj(pr.rows);
+  var plan=$('plan'); plan.replaceChildren();
+  P.DAYS.forEach(function(d,i){ var li=el('li'); var dd=el('div','d'); dd.textContent=d.label; dd.appendChild(el('small','',(state.hours[d.k]||0)+' h')); dd.appendChild(el('em','','about level '+Math.round(pr.rows[i].level))); li.appendChild(dd); var b=el('div'); b.appendChild(el('b','',d.title)); b.appendChild(el('p','small',d.body)); li.appendChild(b); plan.appendChild(li); });
+  var pt=$('paceTable'); pt.replaceChildren(); var tbl=el('table','binds'); var th=el('thead'); var trh=el('tr'); ['Level','Model hours','Your hours'].forEach(function(h){ trh.appendChild(el('th','',h)); }); th.appendChild(trh); tbl.appendChild(th); var tb=el('tbody');
+  var L=logSorted(), cum=0, reached={}; L.forEach(function(e){ cum+=e.hours; reached[e.level]=cum; });
+  P.PACE.filter(function(p){ return p[0]<=40; }).forEach(function(p){ var tr=el('tr'); tr.appendChild(el('td','',String(p[0]))); tr.appendChild(el('td','',String(p[1]))); var yours=''; Object.keys(reached).forEach(function(l){ if(Number(l)>=p[0] && yours==='') yours=reached[l].toFixed(1)+' (at '+l+')'; }); tr.appendChild(el('td','',yours||'')); tb.appendChild(tr); });
+  tbl.appendChild(tb); pt.appendChild(tbl);
+}
+function drawProj(rows){
+  var svg=$('projSvg'); svg.replaceChildren(); var NS='http://www.w3.org/2000/svg';
+  var W=720,H=220,L=44,R=16,T=18,B=34; var maxL=Math.max(25,Math.ceil(Math.max.apply(null,rows.map(function(r){return r.level;}))/5)*5+5);
+  function mk(t,a){ var e=document.createElementNS(NS,t); Object.keys(a).forEach(function(k){ e.setAttribute(k,a[k]); }); return e; }
+  var x=function(i){ return L+(W-L-R)*(i/(rows.length-1)); }, y=function(v){ return T+(H-T-B)*(1-(v-1)/(maxL-1)); };
+  [1,10,15,20,25,30,35,40].filter(function(v){return v<=maxL;}).forEach(function(v){ var g=mk('line',{x1:L,x2:W-R,y1:y(v),y2:y(v),stroke:'currentColor','stroke-opacity':'0.12'}); svg.appendChild(g); var t=mk('text',{x:L-8,y:y(v)+4,'text-anchor':'end','font-size':'11',fill:'currentColor','fill-opacity':'0.7','font-family':'JetBrains Mono, monospace'}); t.textContent=String(v); svg.appendChild(t); });
+  var d=rows.map(function(r,i){ return (i?'L':'M')+x(i).toFixed(1)+' '+y(r.level).toFixed(1); }).join(' ');
+  svg.appendChild(mk('path',{d:d,fill:'none',stroke:'var(--accent)','stroke-width':'2','stroke-linejoin':'round','stroke-linecap':'round'}));
+  rows.forEach(function(r,i){ var t=mk('text',{x:x(i),y:H-12,'text-anchor':'middle','font-size':'12',fill:'currentColor','fill-opacity':'0.8','font-family':'Source Sans 3, sans-serif'}); t.textContent=r.day.label; svg.appendChild(t);
+    if(r.logged){ svg.appendChild(mk('circle',{cx:x(i),cy:y(r.level),r:'7',fill:'var(--bg)'})); svg.appendChild(mk('circle',{cx:x(i),cy:y(r.level),r:'5',fill:'var(--ink)'})); }
+    var ti=mk('title',{}); ti.textContent=r.day.label+': '+(r.logged?'logged level ':'projected level ')+Math.round(r.level); var hit=mk('rect',{x:x(i)-20,y:T,width:40,height:H-T-B,fill:'transparent'}); hit.appendChild(ti); svg.appendChild(hit);
+  });
+  var last=rows[rows.length-1]; var lt=mk('text',{x:x(rows.length-1)-8,y:y(last.level)-10,'text-anchor':'end','font-size':'12','font-weight':'700',fill:'currentColor','font-family':'Source Sans 3, sans-serif'}); lt.textContent='about '+Math.round(last.level); svg.appendChild(lt);
+}
+
+/* PROGRESS */
+function renderDims(){
+  var box=$('dims'); box.replaceChildren();
+  P.DIMS.forEach(function(d){
+    var row=el('div','dim'); var lab=el('div','lab',d.label); lab.appendChild(el('small','',d.sub)); row.appendChild(lab);
+    var val=d.k==='level'?state.level:(Number(state.dims[d.k])||0); var bar=el('div','bar'); var fill=el('i'); fill.style.width=Math.min(100,100*val/d.max)+'%'; bar.appendChild(fill);
+    d.marks.forEach(function(m){ var b=el('b'); b.style.left=(100*m/d.max)+'%'; b.dataset.l=String(m); bar.appendChild(b); });
+    row.appendChild(bar);
+    var inp=el('input'); inp.type='number'; inp.min='0'; inp.max=String(d.k==='gold'?99999:d.max); inp.value=val; inp.inputMode='numeric'; inp.setAttribute('aria-label',d.label);
+    inp.addEventListener('change',function(){ var v=Math.max(0,Number(inp.value)||0); if(d.k==='level'){ state.level=Math.min(60,Math.max(1,v)); } else state.dims[d.k]=v; persist(); renderAll(); });
+    row.appendChild(inp); box.appendChild(row);
+  });
+  var alts=el('div'); alts.style.marginTop='14px'; alts.appendChild(el('b','','The other roads')); alts.appendChild(el('p','small muted','Eight characters, eight of the nine classes. Each class at 25 is a Legacy point for the account, so this roster is worth up to 24 of the 27 class points with no duplicates. Park them at inns; rested experience is free.'));
+  P.ALTS.forEach(function(a){ var row=el('div','dim'); var lab=el('div','lab',a[1]); lab.appendChild(el('small','',a[2])); row.appendChild(lab); var v=Number(state.alts[a[0]])||0; var bar=el('div','bar'); var f=el('i'); f.style.width=Math.min(100,100*v/60)+'%'; bar.appendChild(f); var m=el('b'); m.style.left=(100*25/60)+'%'; m.dataset.l='25'; bar.appendChild(m); row.appendChild(bar); var inp=el('input'); inp.type='number'; inp.min='0'; inp.max='60'; inp.value=v; inp.inputMode='numeric'; inp.setAttribute('aria-label',a[1]+' level'); inp.addEventListener('change',function(){ state.alts[a[0]]=Math.min(60,Math.max(0,Number(inp.value)||0)); persist(); renderDims(); }); row.appendChild(inp); alts.appendChild(row); });
+  box.appendChild(alts);
+  var camp=$('camp'); camp.replaceChildren();
+  P.CAMP.forEach(function(c){ var v=Number(state.dims[c.k])||0; var d=el('div'); if(v>=20) d.classList.add('ready'); d.appendChild(el('b','',c.name+(v>=20?' · ready':' · '+v+'/20'))); d.appendChild(el('span','small',c.buff+'. Exclusive with '+c.excl+'.')); camp.appendChild(d); });
+  var ms=$('msList'); ms.replaceChildren(); var nextLv=(P.MILESTONES.filter(function(m){return m.lv>state.level;})[0]||{}).lv;
+  P.MILESTONES.forEach(function(m){ var li=el('li'); if(m.lv<=state.level) li.classList.add('past'); if(m.lv===nextLv) li.classList.add('now'); li.appendChild(el('span','lv',String(m.lv))); var b=el('div'); var w=el('b','',m.what); if(m.tag) w.appendChild(el('span','tag',m.tag)); b.appendChild(w); b.appendChild(el('p','small',m.do)); li.appendChild(b); ms.appendChild(li); });
+  var feel=$('feel'); feel.replaceChildren();
+  var totals={};
+  P.FEEL.healers.forEach(function(h){ var card=el('div'); card.appendChild(el('b','',h[1]+' · '+h[2])); var grid=el('div','feel'); var total=0, scored=0;
+    P.FEEL.dims.forEach(function(d){ var lab=el('label'); lab.appendChild(el('span','',d[1])); var r=el('input'); r.type='range'; r.min='0'; r.max='5'; r.step='1'; r.value=state.feel[h[0]][d[0]]||0; var o=el('output','',r.value==='0'?'·':r.value); r.addEventListener('input',function(){ o.textContent=r.value==='0'?'·':r.value; }); r.addEventListener('change',function(){ state.feel[h[0]][d[0]]=Number(r.value); persist(); renderDims(); }); lab.appendChild(r); lab.appendChild(o); grid.appendChild(lab); var v=Number(state.feel[h[0]][d[0]])||0; total+=v; if(v>0) scored++; });
+    card.appendChild(grid); totals[h[0]]={total:total,scored:scored}; card.appendChild(el('div','score',scored?total+' / '+(P.FEEL.dims.length*5):'not scored')); feel.appendChild(card); });
+  var k=totals.kooala, best=null; ['quookka','woombat'].forEach(function(x){ if(totals[x].scored===5 && (!best||totals[x].total>totals[best].total)) best=x; });
+  var verdict=el('p','small'); if(k.scored<5) verdict.textContent='Score Kooala after her first dungeon heal; the comparison starts there.'; else if(!best) verdict.textContent='Kooala is scored. Another healer joins the comparison once it has healed a dungeon and all five sliders are set.'; else verdict.textContent=(totals[best].total-k.total>=3)?('That healer beats Kooala by '+(totals[best].total-k.total)+'. Wait a day, then decide as your own call.'):'Nothing beats Kooala by three. Keep her.'; feel.appendChild(verdict);
+}
+
+
+/* thumb grid */
+var gridLayer='base', gridFlip=false;
+function wrapName(s){ if(s.length<=15) return [s]; var parts=s.split(' '); var a='',b=''; parts.forEach(function(w){ if((a+' '+w).trim().length<=15 && !b) a=(a+' '+w).trim(); else b=(b+' '+w).trim(); }); return b?[a,b]:[a]; }
+function renderGrid(){
+  var chips=$('layerChips'); chips.replaceChildren();
+  P.GRID.layers.forEach(function(l){ var b=el('button','chip',l.label); b.type='button'; b.setAttribute('aria-pressed',String(l.k===gridLayer)); b.addEventListener('click',function(){ gridLayer=l.k; renderGrid(); }); chips.appendChild(b); });
+  var layer=P.GRID.layers.filter(function(l){ return l.k===gridLayer; })[0];
+  $('layerBlurb').textContent=layer.bar+'. '+layer.blurb;
+  var svg=$('gridSvg'); svg.replaceChildren(); var NS='http://www.w3.org/2000/svg';
+  function mk(t,a){ var e=document.createElementNS(NS,t); Object.keys(a).forEach(function(k){ e.setAttribute(k,a[k]); }); return e; }
+  var keys=['1','2','3','4','5','6','7','8','9','0','-','='];
+  var cw=122,ch=128,gap=10,x0=8,y0=8;
+  $('flipChip').setAttribute('aria-pressed',String(gridFlip));
+  for(var i=0;i<12;i++){
+    var col=i%3,row=Math.floor(i/3); if(gridFlip) row=3-row; var x=x0+col*(cw+gap),y=y0+row*(ch+gap);
+    var rest=P.GRID.rest.indexOf(i+1)>=0, s=layer.slots[i]||['',''], dim=(gridLayer==='ctrl'&&s[1]==='no change')||!s[0];
+    var g=mk('g',{}); var ti=mk('title',{}); ti.textContent=layer.mod+keys[i]+': '+(s[0]||'empty')+(s[1]?' ('+s[1]+')':''); g.appendChild(ti);
+    g.appendChild(mk('rect',{x:x,y:y,width:cw,height:ch,rx:14,fill:rest?'var(--accent-soft)':'var(--sunk)',stroke:'var(--line)','stroke-width':'1',opacity:dim?'0.55':'1'}));
+    var kt=mk('text',{x:x+10,y:y+20,'font-size':'12','font-family':'JetBrains Mono, monospace','font-weight':'600',fill:'var(--accent)'}); kt.textContent=layer.mod+keys[i]; g.appendChild(kt);
+    var nt=mk('text',{x:x+10,y:y+16,'font-size':'11','font-family':'JetBrains Mono, monospace',fill:'currentColor','fill-opacity':'0.45','text-anchor':'end'}); nt.setAttribute('x',x+cw-10); nt.textContent='#'+(i+1); g.appendChild(nt);
+    var lines=wrapName(s[0]||'empty'); lines.forEach(function(ln,j){ var t=mk('text',{x:x+10,y:y+52+j*18,'font-size':'14','font-weight':'700','font-family':'Source Sans 3, sans-serif',fill:'currentColor',opacity:dim?'0.6':'1'}); t.textContent=ln; g.appendChild(t); });
+    if(s[1]){ var sub=wrapName(s[1]); sub.slice(0,2).forEach(function(ln,j){ var t=mk('text',{x:x+10,y:y+96+j*15,'font-size':'11.5','font-family':'Source Sans 3, sans-serif',fill:'currentColor','fill-opacity':'0.65'}); t.textContent=ln; g.appendChild(t); }); }
+    svg.appendChild(g);
+  }
+}
+
+function renderScreen(){
+  var svg=$('screenSvg'); if(!svg) return; svg.replaceChildren(); var NS='http://www.w3.org/2000/svg';
+  function mk(t,a){ var e=document.createElementNS(NS,t); Object.keys(a).forEach(function(k){ e.setAttribute(k,a[k]); }); return e; }
+  function box(x,y,w,h,label,opt){ opt=opt||{}; var g=mk('g',{}); g.appendChild(mk('rect',{x:x,y:y,width:w,height:h,rx:opt.rx||4,fill:opt.fill||'var(--sunk)',stroke:opt.stroke||'currentColor','stroke-opacity':opt.so||'0.35','stroke-width':'1'})); if(label){ var t=mk('text',{x:x+w/2,y:y+h/2+4,'text-anchor':'middle','font-size':opt.fs||'11','font-family':'Source Sans 3, sans-serif',fill:'currentColor','fill-opacity':'0.85'}); t.textContent=label; g.appendChild(t);} svg.appendChild(g); return g; }
+  function grid(x,y,cell,label,accent){ var gapc=3; for(var i=0;i<12;i++){ var c=i%3,r=Math.floor(i/3); svg.appendChild(mk('rect',{x:x+c*(cell+gapc),y:y+r*(cell+gapc),width:cell,height:cell,rx:3,fill:accent?'var(--accent-soft)':'var(--sunk)',stroke:'var(--accent)','stroke-opacity':accent?'0.9':'0.5','stroke-width':'1'})); } var t=mk('text',{x:x+(3*cell+2*gapc)/2,y:y+4*cell+3*gapc+12,'text-anchor':'middle','font-size':'10.5','font-weight':'700','font-family':'Source Sans 3, sans-serif',fill:'currentColor'}); t.textContent=label; svg.appendChild(t); }
+  svg.appendChild(mk('rect',{x:1,y:1,width:638,height:418,rx:10,fill:'var(--surface)',stroke:'currentColor','stroke-opacity':'0.5'}));
+  svg.appendChild(mk('circle',{cx:596,cy:40,r:26,fill:'var(--sunk)',stroke:'currentColor','stroke-opacity':'0.35'}));
+  var mm=mk('text',{x:596,y:44,'text-anchor':'middle','font-size':'10','font-family':'Source Sans 3, sans-serif',fill:'currentColor','fill-opacity':'0.85'}); mm.textContent='Minimap'; svg.appendChild(mm);
+  box(510,80,120,80,'Quest tracker'); box(510,170,120,120,'Polestar guide'); box(10,310,160,96,'Chat'); box(520,380,110,26,'Bags · menu',{fs:'10'});
+  var you=mk('text',{x:320,y:150,'text-anchor':'middle','font-size':'12','font-family':'Spectral, serif','font-weight':'700',fill:'currentColor','fill-opacity':'0.7'}); you.textContent='Kooala'; svg.appendChild(you);
+  svg.appendChild(mk('line',{x1:320,y1:158,x2:320,y2:196,stroke:'currentColor','stroke-opacity':'0.25','stroke-dasharray':'3 3'}));
+  box(250,200,140,22,'Target'); box(250,226,140,22,'Player'); box(262,252,116,10,'',{fill:'var(--accent)',stroke:'none'});
+  var cb=mk('text',{x:320,y:275,'text-anchor':'middle','font-size':'10','font-family':'Source Sans 3, sans-serif',fill:'currentColor','fill-opacity':'0.7'}); cb.textContent='cast bar'; svg.appendChild(cb);
+  for(var i=0;i<5;i++) box(170,284+i*20,64,17,i===0?'you':'party '+i,{fs:'9.5'});
+  var pf=mk('text',{x:202,y:396,'text-anchor':'middle','font-size':'10.5','font-weight':'700','font-family':'Source Sans 3, sans-serif',fill:'currentColor'}); pf.textContent='Party, raid-style'; svg.appendChild(pf);
+  grid(250,284,23,'Thumb · Bar 1',true); grid(348,284,19,'Shift · Bar 2',false);
+  for(var j=0;j<12;j++) svg.appendChild(mk('rect',{x:250+j*14,y:404,width:12,height:10,rx:2,fill:'var(--sunk)',stroke:'currentColor','stroke-opacity':'0.35'}));
+  var ob=mk('text',{x:424,y:412,'text-anchor':'start','font-size':'10','font-family':'Source Sans 3, sans-serif',fill:'currentColor','fill-opacity':'0.7'}); ob.textContent='Option · Bar 3'; svg.appendChild(ob);
+  checklist($('screenList'),P.SCREEN,'screen'); checklist($('synapseList'),P.SYNAPSE,'synapse');
+}
+function renderKeys(){ var tb=$('keys'); tb.replaceChildren(); P.KEYS.forEach(function(r){ var tr=el('tr'); r.forEach(function(c){ tr.appendChild(el('td','',c)); }); tb.appendChild(tr); }); checklist($('setupList'),P.SETUP,'setup'); }
+
+/* KIT */
+function renderKit(){
+  var lad=document.querySelectorAll('#ladder tr[data-lv]'); var nextLv=null; lad.forEach(function(tr){ var lv=Number(tr.getAttribute('data-lv')); tr.classList.toggle('past', lv<=state.level); if(nextLv===null && lv>state.level) nextLv=lv; }); lad.forEach(function(tr){ tr.classList.toggle('now', Number(tr.getAttribute('data-lv'))===nextLv); });
+  var box=$('decisions'); box.replaceChildren();
+  P.DECISIONS.forEach(function(d){ var wrap=el('div'); wrap.appendChild(el('b','',d.label));
+    if(d.type==='time'){ var inp=el('input'); inp.type='time'; inp.value=state.decisions.stop||''; inp.className='num'; inp.style.cssText='display:block;margin:6px 0;border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:8px 10px;min-height:44px'; inp.setAttribute('aria-label',d.label); inp.addEventListener('change',function(){ state.decisions.stop=inp.value; persist(); renderSession(); }); wrap.appendChild(inp); }
+    else { var chips=el('div','chips'); chips.style.margin='6px 0'; d.opts.forEach(function(o){ var b=el('button','chip',o); b.type='button'; b.setAttribute('aria-pressed',String(state.decisions[d.k]===o)); b.addEventListener('click',function(){ state.decisions[d.k]=o; persist(); renderKit(); }); chips.appendChild(b); }); wrap.appendChild(chips); }
+    wrap.appendChild(el('p','small muted',d.note)); box.appendChild(wrap); });
+  checklist($('settingsList'),P.SETTINGS,'set');
+  renderGrid(); renderKeys(); renderScreen();
+  var m=$('macros'); m.replaceChildren(); P.MACROS.forEach(function(x){ var h=el('div','khead'); var nm=el('span','',x.n); if(x.name&&x.name!==x.n) nm.appendChild(el('span','small muted',' · in game: '+x.name)); h.appendChild(nm); var b=el('button','btn','Copy'); b.type='button'; b.style.minHeight='36px'; b.addEventListener('click',function(){ copyText(x.m,function(ok){ toast(ok?'Copied':'Select and copy by hand'); }); }); h.appendChild(b); m.appendChild(h); m.appendChild(el('pre','macro',x.m)); m.appendChild(el('p','small muted',x.note)); });
+  var s=$('sources'); s.replaceChildren(); P.SOURCES.forEach(function(x){ var li=el('li'); var a=el('a','',x[0]); a.href=x[1]; li.appendChild(a); s.appendChild(li); });
+}
+
+/* SCRIBE: the addon's line in, Data.lua out. Append-only by session key; the replace-everything import above is a different door. */
+function luaUnescape(s){ return s.replace(/\\(\d{1,3}|[\s\S])/g, function(_,c){ if(/^\d+$/.test(c)) return String.fromCharCode(Number(c)); var m={n:'\n',t:'\t',r:'\r',a:'\x07',b:'\b',f:'\f',v:'\v'}; return m[c]!==undefined?m[c]:c; }); }
+function scribeParse(text){
+  var t=String(text||'').trim(); if(!t) throw new Error('empty');
+  if(/PouchScribeDB\s*=/.test(t)){ var m=t.match(/\["json"\]\s*=\s*"((?:[^"\\]|\\[\s\S])*)"/); if(!m) throw new Error('no json in the saved file'); t=luaUnescape(m[1]); if(!t) return []; }
+  var obj=JSON.parse(t), list=[];
+  if(Array.isArray(obj)) list=obj; else if(obj&&(Array.isArray(obj.sessions)||Array.isArray(obj.open))) list=(obj.sessions||[]).concat(obj.open||[]); else if(obj&&typeof obj==='object') list=[obj];
+  return list.filter(function(p){ return p&&typeof p==='object'&&p.src==='scribe'&&p.key&&p.char; });
+}
+var SKILL_DIMS={Tailoring:'tailoring',Enchanting:'enchanting',Fishing:'fishing','First Aid':'firstaid',Cooking:'cooking'};
+function scribeApply(list){
+  var out={added:[],updated:[],alts:[],skipped:[]};
+  list.forEach(function(p){
+    var who=String(p.char||'').toLowerCase(), level=Math.min(60,Math.max(1,Number(p.level)||1));
+    if(who==='kooala'){
+      var hours=Math.round((Number(p.hours)||0)*100)/100;
+      var existing=state.log.filter(function(e){ return e.src==='scribe'&&e.key===p.key; })[0];
+      var entry={d:String(p.d||''),level:level,hours:hours,build:String(p.build||''),broke:existing?existing.broke:'',fun:existing?existing.fun:'',src:'scribe',key:String(p.key),deaths:Number(p.deaths)||0,quests:Number(p.quests)||0,dungeons:listOf(p.dungeons),spec:String(p.spec||''),feel:(p.feel&&typeof p.feel==='object')?p.feel:{}};
+      if(existing){ Object.keys(entry).forEach(function(k){ existing[k]=entry[k]; }); out.updated.push(entry.d+' level '+level+', '+hours+' h'); }
+      else { state.log.push(entry); out.added.push(entry.d+' level '+level+', '+hours+' h'); }
+      if(level>state.level) state.level=level;
+      Object.keys(SKILL_DIMS).forEach(function(k){ var v=Number((p.skills||{})[k]); if(v>(Number(state.dims[SKILL_DIMS[k]])||0)) state.dims[SKILL_DIMS[k]]=v; });
+      var tp=0; Object.keys(p.talents||{}).forEach(function(k){ tp+=Number(p.talents[k])||0; }); if(tp>(Number(state.dims.talents)||0)) state.dims.talents=tp;
+      if(typeof p.gold==='number'&&!p.open) state.dims.gold=Math.round(p.gold/100)/100;
+      else if(typeof p.gold==='number'&&p.gold/10000>(Number(state.dims.gold)||0)) state.dims.gold=Math.round(p.gold/100)/100;
+    } else {
+      var alt=P.ALTS.filter(function(a){ return a[0]===who; })[0];
+      if(!alt) out.skipped.push(p.char+' is not on the roster');
+      else if(level>(Number(state.alts[alt[0]])||0)){ state.alts[alt[0]]=level; out.alts.push(alt[1]+' to '+level); }
+      else out.skipped.push(alt[1]+' already at '+state.alts[alt[0]]);
+    }
+  });
+  return out;
+}
+function scribeReport(r){
+  var parts=[];
+  if(r.added.length) parts.push('Added '+r.added.join('; '));
+  if(r.updated.length) parts.push('Updated '+r.updated.join('; '));
+  if(r.alts.length) parts.push(r.alts.join(', '));
+  if(r.skipped.length) parts.push('Skipped: '+r.skipped.join(', '));
+  return parts.length?parts.join('. ')+'.':'Nothing new in that line.';
+}
+function scribeTake(text,how){
+  var list; try{ list=scribeParse(text); }catch(e){ $('scribeMsg').textContent='That is not a Scribe line or file: '+e.message; toast('Not from Scribe'); return; }
+  if(!list.length){ $('scribeMsg').textContent='No Scribe session in that yet. The file is written at logout or /reload; the line comes from /pouch.'; return; }
+  var r=scribeApply(list); persist(); renderAll(); $('scribeMsg').textContent=scribeReport(r)+(how?' ('+how+')':''); $('scribeIn').value=''; toast(r.added.length||r.updated.length||r.alts.length?'Taken in.':'Nothing new.');
+}
+$('scribeAdd').addEventListener('click',function(){ scribeTake($('scribeIn').value,''); });
+$('scribeFile').addEventListener('change',function(){ var f=this.files&&this.files[0]; if(!f) return; var me=this; f.text().then(function(t){ scribeTake(t,'from '+f.name); me.value=''; }); });
+$('scribeIn').addEventListener('dragover',function(e){ e.preventDefault(); });
+$('scribeIn').addEventListener('drop',function(e){ var f=e.dataTransfer&&e.dataTransfer.files&&e.dataTransfer.files[0]; if(!f) return; e.preventDefault(); f.text().then(function(t){ scribeTake(t,'dropped '+f.name); }); });
+/* A remembered file handle (File System Access API), kept in IndexedDB. Chrome only, and only when this page is a top-level tab: a framed page gets a SecurityError, in which case the button hides itself. */
+var FS_DB='pouch.fs', FS_KEY='scribeFile';
+function fsStore(mode){ return new Promise(function(res,rej){ var q=indexedDB.open(FS_DB,1); q.onupgradeneeded=function(){ q.result.createObjectStore('h'); }; q.onerror=function(){ rej(q.error); }; q.onsuccess=function(){ var tx=q.result.transaction('h',mode); res({store:tx.objectStore('h'),done:new Promise(function(r){ tx.oncomplete=r; })}); }; }); }
+function fsSave(h){ return fsStore('readwrite').then(function(s){ s.store.put(h,FS_KEY); return s.done; }); }
+function fsLoad(){ return fsStore('readonly').then(function(s){ return new Promise(function(res){ var g=s.store.get(FS_KEY); g.onsuccess=function(){ res(g.result||null); }; g.onerror=function(){ res(null); }; }); }).catch(function(){ return null; }); }
+function fsReadable(h){ return h.queryPermission({mode:'read'}).then(function(p){ if(p==='granted') return true; return h.requestPermission({mode:'read'}).then(function(p2){ return p2==='granted'; }); }); }
+(function(){
+  if(!window.showOpenFilePicker||!window.indexedDB) return;
+  var hb=$('scribeHandle'); hb.hidden=false;
+  fsLoad().then(function(h){ if(h&&h.name) hb.textContent='Re-read '+h.name; });
+  hb.addEventListener('click',function(){
+    fsLoad().then(function(h){
+      var pick=h?Promise.resolve(h):window.showOpenFilePicker({types:[{description:'Lua',accept:{'text/plain':['.lua']}}]}).then(function(hs){ return hs[0]; });
+      return pick.then(function(h2){ return fsReadable(h2).then(function(ok){ if(!ok) throw new Error('the browser did not grant read access'); return h2.getFile().then(function(f){ return f.text(); }).then(function(t){ scribeTake(t,'re-read '+h2.name); hb.textContent='Re-read '+h2.name; return fsSave(h2); }); }); });
+    }).catch(function(e){
+      if(e&&e.name==='SecurityError'){ hb.hidden=true; $('scribeMsg').textContent='This page is framed, so the browser will not remember the file here. Pick it or drop it instead.'; }
+      else if(e&&e.name!=='AbortError'){ $('scribeMsg').textContent='Could not read the file: '+(e.message||e); }
+    });
+  });
+})();
+/* Data.lua for the addon. The same function lives in the repo (tools/lib/data.js); keep them identical. */
+function scribeData(P, ladder, stop, generatedAt, bar3) {
+	function q(s) {
+		s = String(s === undefined || s === null ? '' : s);
+		return '"' + s.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\r?\n/g, '\\n') + '"';
+	}
+	// The game caps macro names at 16 characters; Pouch's titles are longer.
+	function macroName(m) {
+		if (m.name) return m.name;
+		var n = String(m.n || '').replace(/^Power Word: /, 'PW: ');
+		return n.length > 16 ? n.slice(0, 16) : n;
+	}
+	var BAR_KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '-', '='];
+	var MOD3 = bar3 === 'Option' ? 'ALT-' : 'META-';
+	var lines = [];
+	lines.push('-- Pouch Scribe data, generated by Pouch on ' + generatedAt + '.');
+	lines.push('-- Do not edit by hand: Pouch is the source. Download it again from the Log tab,');
+	lines.push('-- drop it in Interface/AddOns/PouchScribe/ and /reload. A plain table, no code.');
+	lines.push('local ADDON, ns = ...');
+	lines.push('ns.Data = {');
+	lines.push('\tv = 1,');
+	lines.push('\tgenerated = ' + q(generatedAt) + ',');
+	lines.push('\tstop = ' + q(stop || '') + ',');
+	lines.push('\t-- level -> { point, what it buys }');
+	lines.push('\tladder = {');
+	for (var i = 0; i < ladder.length; i++) {
+		lines.push('\t\t[' + Number(ladder[i].lv) + '] = { ' + q(ladder[i].point) + ', ' + q(ladder[i].buys) + ' },');
+	}
+	lines.push('\t},');
+	lines.push('\t-- level -> { what = unlocks, act = what to do about it, tag = Classic | Forever }');
+	lines.push('\tmilestones = {');
+	for (var j = 0; j < P.MILESTONES.length; j++) {
+		var m = P.MILESTONES[j];
+		lines.push('\t\t[' + Number(m.lv) + '] = { what = ' + q(m.what) + ', act = ' + q(m['do']) + ', tag = ' + q(m.tag || '') + ' },');
+	}
+	lines.push('\t},');
+	lines.push('\t-- the macros /pouch setup creates, by in-game name (16 characters at most)');
+	lines.push('\tmacros = {');
+	for (var k = 0; k < P.MACROS.length; k++) {
+		var mac = P.MACROS[k];
+		if (mac.template || /\bSPELL\b/.test(mac.m)) continue;
+		lines.push('\t\t{ name = ' + q(macroName(mac)) + ', title = ' + q(mac.n) + ', body = ' + q(mac.m) + ', note = ' + q(mac.note || '') + ' },');
+	}
+	lines.push('\t},');
+	lines.push('\t-- key -> binding command, in SetBinding terms (Cmd is META-, Option is ALT- on the Mac client)');
+	lines.push('\tbindings = {');
+	for (var b = 0; b < 12; b++) {
+		lines.push('\t\t{ key = ' + q('SHIFT-' + BAR_KEYS[b]) + ', action = ' + q('MULTIACTIONBAR1BUTTON' + (b + 1)) + ' },');
+	}
+	for (var c = 0; c < 12; c++) {
+		lines.push('\t\t{ key = ' + q(MOD3 + BAR_KEYS[c]) + ', action = ' + q('MULTIACTIONBAR2BUTTON' + (c + 1)) + ' },');
+	}
+	var extras = P.SCRIBE_BINDINGS || [
+		['BUTTON3', 'TOGGLEAUTORUN'], ['F', 'FOLLOWTARGET'], ['Q', 'ASSISTTARGET'], ['E', 'TARGETNEARESTFRIEND'],
+		['`', 'MACRO Stop casting'],
+	];
+	for (var e = 0; e < extras.length; e++) {
+		lines.push('\t\t{ key = ' + q(extras[e][0]) + ', action = ' + q(extras[e][1]) + ' },');
+	}
+	lines.push('\t},');
+	lines.push('\t-- keys /pouch setup clears: the pet bar, so Caps (Ctrl) reaches the macros');
+	lines.push('\tunbind = {');
+	var pet = [];
+	for (var u = 0; u < 10; u++) pet.push(q('CTRL-' + BAR_KEYS[u]));
+	lines.push('\t\t' + pet.join(', ') + ',');
+	lines.push('\t},');
+	lines.push('}');
+	return lines.join('\n') + '\n';
+}
+function ladderRows(){ var out=[]; document.querySelectorAll('#ladder tr[data-lv]').forEach(function(tr){ var td=tr.querySelectorAll('td'); out.push({lv:Number(tr.getAttribute('data-lv')),point:td[1].textContent,buys:td[2].textContent}); }); return out; }
+$('scribeData').addEventListener('click',function(){
+  var text=scribeData(P,ladderRows(),state.decisions.stop||'',new Date().toISOString().replace(/\.\d{3}Z$/,'Z'),state.decisions.bar3||'Cmd');
+  var what=ladderRows().length+' ladder rows, '+P.MILESTONES.length+' milestones, '+P.MACROS.filter(function(m){ return !m.template; }).length+' macros, stop '+(state.decisions.stop||'none')+', Bar 3 on '+(state.decisions.bar3||'Cmd');
+  /* The artifact viewer saves files only through its downloads capability; a plain blob link does nothing here. Without it, the text goes in the box below to copy out. */
+  var fallback=function(why){ var io=$('io'); io.hidden=false; io.dataset.mode=''; io.value=text; $('importBtn').textContent='Paste a copy in'; $('scribeMsg').textContent=(why||'Saving files is not available in this view')+'. Data.lua is in the box at the bottom of this tab ('+what+'): select all, copy, save it as Data.lua in Interface/AddOns/PouchScribe/, then /reload.'; io.focus(); io.select(); };
+  if(!window.claude||typeof window.claude.use!=='function'){ fallback(); return; }
+  window.claude.use('downloads').then(function(dl){
+    if(!dl){ fallback(); return; }
+    return dl.save({filename:'Data.lua',data:text}).then(function(){ toast('Data.lua saved. Drop it in the addon folder, then /reload.'); $('scribeMsg').textContent='Data.lua saved: '+what+'. Replace the one in Interface/AddOns/PouchScribe/ and /reload.'; }).catch(function(e){ if(e&&e.code==='declined') return; fallback('The save did not go through ('+((e&&e.code)||'error')+')'); });
+  }).catch(function(){ fallback(); });
+});
+
+/* LOG */
+function renderLog(){
+  var box=$('entries'); box.replaceChildren(); var L=logSorted().reverse(); $('logCount').textContent=L.length+(L.length===1?' entry':' entries');
+  if(!L.length){ box.appendChild(el('p','muted small','Nothing yet. The first entry is launch night.')); }
+  L.forEach(function(e){ var row=el('div','entry'); row.appendChild(el('div','d',e.d)); var mid=el('div'); var lv=el('div','lv','Level '+e.level+' · '+e.hours+' h'+(e.build?' · build '+e.build:'')); if(e.src==='scribe'){ var pill=el('span','pill','Scribe'); pill.style.marginLeft='8px'; lv.appendChild(pill); } mid.appendChild(lv);
+    if(e.src==='scribe'){ var bits=[(e.deaths||0)+(e.deaths===1?' death':' deaths'),(e.quests||0)+(e.quests===1?' quest':' quests')]; if(e.dungeons&&e.dungeons.length) bits.push(e.dungeons.join(', ')); if(e.spec) bits.push('spec '+e.spec); var feelKeys=Object.keys(e.feel||{}); if(feelKeys.length) bits.push('feel '+feelKeys.map(function(k){ return k+' '+e.feel[k]; }).join(', ')); mid.appendChild(el('p','small muted',bits.join(' · '))); }
+    if(e.broke) mid.appendChild(el('p','','Broke: '+e.broke)); if(e.fun) mid.appendChild(el('p','','Fun: '+e.fun)); row.appendChild(mid);
+    var acts=el('div','stack'); var del=el('button','','remove'); del.type='button'; del.addEventListener('click',function(){ state.log=state.log.filter(function(x){ return x!==e; }); persist(); renderAll(); }); acts.appendChild(del);
+    var note=el('button','',e.broke||e.fun?'edit notes':'add notes'); note.type='button'; note.addEventListener('click',function(){ var f=mid.querySelector('.notes'); if(f){ f.remove(); return; } f=el('div','notes stack'); var b=el('label','f','What broke'); var bi=el('textarea'); bi.value=e.broke||''; b.appendChild(bi); var u=el('label','f','What was fun'); var ui=el('textarea'); ui.value=e.fun||''; u.appendChild(ui); var save=el('button','btn','Save notes'); save.type='button'; save.addEventListener('click',function(){ e.broke=bi.value.trim(); e.fun=ui.value.trim(); persist(); renderAll(); }); f.appendChild(b); f.appendChild(u); f.appendChild(save); mid.appendChild(f); bi.focus(); }); acts.appendChild(note);
+    row.appendChild(acts); box.appendChild(row); });
+  if(!$('logDate').value) $('logDate').value=new Date().toLocaleDateString('en-CA',{timeZone:'America/New_York'});
+  if(!$('logLevel').value) $('logLevel').value=state.level;
+}
+$('logAdd').addEventListener('click',function(){
+  var e={d:$('logDate').value||new Date().toLocaleDateString('en-CA',{timeZone:'America/New_York'}),level:Math.min(60,Math.max(1,Number($('logLevel').value)||state.level)),hours:Math.max(0,Number($('logHours').value)||0),build:$('logBuild').value.trim(),broke:$('logBroke').value.trim(),fun:$('logFun').value.trim()};
+  state.log.push(e); if(e.level>state.level) state.level=e.level; $('logHours').value=''; $('logBroke').value=''; $('logFun').value=''; persist(); renderAll(); toast('Logged. Sleep well.'); location.hash='#log';
+});
+$('exportBtn').addEventListener('click',function(){ var t=JSON.stringify(state,null,1); var io=$('io'); io.hidden=false; io.value=t; copyText(t,function(ok){ toast(ok?'Copied. Paste it anywhere safe.':'Copy blocked; select the text below.'); }); });
+$('importBtn').addEventListener('click',function(){ var io=$('io'); if(io.hidden||io.dataset.mode!=='import'){ io.hidden=false; io.dataset.mode='import'; io.value=''; io.placeholder='Paste a copy here, then press this button again.'; io.focus(); $('importBtn').textContent='Load the pasted copy'; return; } try{ var inc=JSON.parse(io.value); state=merge(state,inc); persist(); renderAll(); toast('Loaded.'); io.hidden=true; io.dataset.mode=''; $('importBtn').textContent='Paste a copy in'; }catch(e){ toast('That is not a Pouch copy.'); } });
+var resetArmed=0; $('resetBtn').addEventListener('click',function(){ var now=Date.now(); if(now-resetArmed>5000){ resetArmed=now; $('resetBtn').textContent='Click again within 5 s to erase'; setTimeout(function(){ $('resetBtn').textContent='Start over'; },5000); return; } state=fresh(); persist(); renderAll(); $('resetBtn').textContent='Start over'; toast('Fresh pouch.'); });
+
+$('flipChip').addEventListener('click',function(){ gridFlip=!gridFlip; renderGrid(); });
+/* session controls */
+$('lvDown').addEventListener('click',function(){ state.level=Math.max(1,state.level-1); persist(); renderAll(); });
+$('lvUp').addEventListener('click',function(){ state.level=Math.min(60,state.level+1); persist(); renderAll(); });
+document.querySelectorAll('#minsChips .chip').forEach(function(b){ b.addEventListener('click',function(){ state.minutes=Number(b.dataset.m); persist(); renderSession(); }); });
+document.querySelectorAll('#moodChips .chip').forEach(function(b){ b.addEventListener('click',function(){ state.mood=b.dataset.mood; persist(); renderSession(); }); });
+
+/* routing */
+function route(){ var h=(location.hash||'#now').replace('#',''); if(VIEWS.indexOf(h)<0) h='now'; VIEWS.forEach(function(v){ $('v-'+v).classList.toggle('on',v===h); }); document.querySelectorAll('nav.tabs a').forEach(function(a){ if(a.dataset.v===h) a.setAttribute('aria-current','page'); else a.removeAttribute('aria-current'); }); window.scrollTo({top:0}); }
+window.addEventListener('hashchange',route);
+
+function renderAll(){ renderCountdown(); renderSession(); renderWeek(); renderDims(); renderKit(); renderLog(); renderCounts(); }
+checklist($('preList'),P.PRE,'pre'); checklist($('nightList'),P.NIGHT,'night'); renderBreaks();
+renderAll(); route();
+setInterval(renderCountdown,30000);
+})();
+</script>
+</body>
+</html>
